@@ -1,0 +1,30 @@
+{
+  "model": "improved_cnn (CIFAR-10)",
+  "classes": [
+    "airplane",
+    "automobile",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck"
+  ],
+  "input": "1x32x32x3 float32 RGB scaled to [0,1]; centre/ROI square crop, cv2 INTER_AREA resize",
+  "output": "10 logits (apply softmax)",
+  "seed": 42,
+  "split": "45k train / 5k val / 10k test",
+  "val_accuracy": 0.8718,
+  "test_accuracy": 0.8647,
+  "tensorflow": "2.21.0",
+  "quick_run": false,
+  "sha256": {
+    "cifar10_cnn.keras": "3e5ad1552e886b028f73549e1447c40dc4c6b3e97bbdd5f3681119df746bf48a",
+    "cifar10_cnn.tflite": "51b68b83af797cb7434880808e947268fc4f44cbdb626f7e3289799080e46508",
+    "cifar10_cnn_dynamic.tflite": "55ae71aa4242c97a664f5fdc4728364ea4303709b9c60857203ab9f38a3645ac",
+    "cifar10_cnn_fp16.tflite": "35601036321e9b17ff3c64643d9e9e0e6f9837727ec2adf2d3d69a01a089afa3",
+    "cifar10_cnn_int8.tflite": "b6875064df12f1f6711bd6ffef9b8bb114d03ea3ce68bb5901fd0e663624cf0f"
+  }
+}

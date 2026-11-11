@@ -7,6 +7,22 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 | [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, own-image and Webots-camera predictions, and TFLite quantisation benchmark |
 | [`webots_project/`](webots_project/) | Webots R2025a package: e-puck colour-block search with OpenCV HSV detection and off-loop CNN inference. See its [README](webots_project/README.md) and [DEMO](webots_project/DEMO.md). |
 
+## Results (CPU training run, seed 42)
+
+| Model | Validation | Test (10,000 images) | Parameters |
+|---|---|---|---|
+| Lecture baseline + SGD (10 epochs) | 59.62% | 60.61% | 122,570 |
+| Lecture baseline + Adam (10 epochs) | 67.12% | 66.90% | 122,570 |
+| **Improved CNN + Adam** (80 epochs) | **87.18%** | **86.47%** ± 0.67% (95% CI) | 306,154 |
+
+| Deployment variant | Size | Median latency (M4 CPU) | Test accuracy |
+|---|---|---|---|
+| Keras float32 | 3.8 MB | 4.85 ms | 86.47% |
+| TFLite float32 | 1226 kB | 0.12 ms | 86.47% |
+| TFLite full int8 (used on the robot) | 328 kB | 0.09 ms | 86.57% |
+
+Figures, model files and the model card are in [`cnn/results/`](cnn/results/). Webots run logs and captures are in [`cnn/results/webots_runs/`](cnn/results/webots_runs/).
+
 ## Quick start
 
 ```bash

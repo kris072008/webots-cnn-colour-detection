@@ -1,0 +1,2 @@
+wall_time,sim_time_s,event,colour,area_fraction,image,cnn_label,cnn_confidence
+2026-11-12T06:06:44,0.10,cnn_prediction,,,startup_001.png,horse,0.945
