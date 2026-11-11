@@ -1,0 +1,239 @@
+<title>Part 2 Report Outline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each report section is a block with a marks chip, the rubric's "excellent" bar, and a tickable checklist. */
+:root {
+  --bg: #f6f7f9; --surface: #ffffff; --fg: #1b2330; --muted: #5b6676; --line: #dde2ea;
+  --accent: #1f6f78; --accent-soft: #e3f1f2; --warn: #8a5a00; --warn-soft: #fbf1dc;
+  --display: "IBM Plex Serif", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161d; --surface: #1a2029; --fg: #e3e8ef; --muted: #9aa5b4; --line: #2c3440;
+  --accent: #6cc3cb; --accent-soft: #1d3236; --warn: #e8b85c; --warn-soft: #33291a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e3e8ef; --muted: #9aa5b4; --line: #2c3440;
+  --accent: #6cc3cb; --accent-soft: #1d3236; --warn: #e8b85c; --warn-soft: #33291a; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body); }
+.wrap { max-width: 780px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; line-height: 1.25; margin: 0; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; font-weight: 600; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 65ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 500 .8rem var(--mono); color: var(--muted); }
+.note { background: var(--warn-soft); color: var(--fg); border-left: 3px solid var(--warn); padding: 12px 16px; border-radius: 4px; max-width: 70ch; }
+.note strong { color: var(--warn); }
+.marks { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+td.num { text-align: right; font-family: var(--mono); }
+.sec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sec header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.chip { font: 500 .78rem var(--mono); background: var(--accent-soft); color: var(--accent); padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+.bar { font-size: .86rem; color: var(--muted); border-left: 2px solid var(--accent); padding-left: 12px; }
+ul.check { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+ul.check label { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; cursor: pointer; }
+ul.check input { margin-top: 4px; accent-color: var(--accent); }
+ul.check input:checked + span { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+code, .ph { font-family: var(--mono); font-size: .84em; }
+.ph { background: var(--warn-soft); color: var(--warn); padding: 0 4px; border-radius: 3px; }
+.refs li { font-size: .86rem; }
+.progress { font: 500 .8rem var(--mono); color: var(--accent); }
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <h3>5FTC2068 Applied Robotics and AI Project · Assignment 4</h3>
+    <h1>Final report outline: CNN classification and colour-block detection with an e-puck</h1>
+    <div class="meta"><span>Due 21 Nov 2026, 11:30 pm</span><span>Worth 20%</span><span>Submit with the Webots package</span><span class="progress" id="progress">0 of 0 done</span></div>
+    <p class="lede">Each block below is one report section, in the order the brief asks for. Each lists its marks, what the rubric's top band needs, and what to include from your project. Placeholders like <span class="ph">[test accuracy]</span> are numbers you take from your own Colab run. Tick items as you write them; ticks are saved in this browser only.</p>
+  </div>
+
+  <p class="note"><strong>Write it yourself.</strong> This is a plan, not text to paste. Check your course's AI-use policy, write every section in your own words, and make sure you can explain each design choice in the presentation.</p>
+
+  <section class="marks" aria-label="Marks by section">
+    <table>
+      <thead><tr><th>Rubric criterion</th><th>Report section</th><th style="text-align:right">Marks</th><th style="text-align:right">Suggested share</th></tr></thead>
+      <tbody>
+        <tr><td>Project title</td><td>Title page</td><td class="num">10</td><td class="num">—</td></tr>
+        <tr><td>Aims and objectives</td><td>1 Introduction</td><td class="num">10</td><td class="num">10%</td></tr>
+        <tr><td>Literature review</td><td>2 Literature review</td><td class="num">10</td><td class="num">15%</td></tr>
+        <tr><td>Methodology</td><td>3 Methodology</td><td class="num">20</td><td class="num">30%</td></tr>
+        <tr><td>Evaluation of results</td><td>4 Evaluation of results</td><td class="num">20</td><td class="num">25%</td></tr>
+        <tr><td>Discussion and conclusions</td><td>5 Conclusion</td><td class="num">20</td><td class="num">20%</td></tr>
+        <tr><td>Bibliography and references</td><td>6 References</td><td class="num">10</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <article class="sec">
+    <header><h2>Title page</h2><span class="chip">10 marks</span></header>
+    <p class="bar">Top band: a precise, informative title.</p>
+    <h3>Title options (pick or adapt one)</h3>
+    <ul class="plain">
+      <li>Colour-Block Search and CIFAR-10 CNN Classification on a Simulated e-puck Robot, with Asynchronous Quantised Inference</li>
+      <li>Real-Time HSV Colour Detection and Off-Loop CNN Object Classification for an e-puck in Webots</li>
+    </ul>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-t1"><span>Title names the robot, the simulator, both techniques and the optimisation angle</span></label></li>
+      <li><label><input type="checkbox" id="c-t2"><span>Name, student ID, module code, date, GitHub repository link</span></label></li>
+    </ul>
+  </article>
+
+  <article class="sec">
+    <header><h2>1 Introduction</h2><span class="chip">10 marks</span></header>
+    <p class="bar">Top band: measurable objectives, with milestones that were achieved.</p>
+    <h3>Include</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-i1"><span>Background: why heavy models are trained off-robot, and why on-robot inference must not disturb control (link to the brief)</span></label></li>
+      <li><label><input type="checkbox" id="c-i2"><span>Link to Part 1 of the project: what the robot already did and what Part 2 adds</span></label></li>
+      <li><label><input type="checkbox" id="c-i3"><span>Aim, in one sentence</span></label></li>
+      <li><label><input type="checkbox" id="c-i4"><span>Numbered, measurable objectives with a target and an achieved result each (table below)</span></label></li>
+      <li><label><input type="checkbox" id="c-i5"><span>Milestones with dates from your Trello board (screenshot in the appendix)</span></label></li>
+      <li><label><input type="checkbox" id="c-i6"><span>One-paragraph roadmap of the report</span></label></li>
+    </ul>
+    <h3>Objectives table to fill in</h3>
+    <div class="marks"><table>
+      <thead><tr><th>Objective</th><th>Target</th><th>Achieved</th></tr></thead>
+      <tbody>
+        <tr><td>O1 Train a CNN on CIFAR-10 and show every layer</td><td>Test accuracy above the lecture baseline (about 70%)</td><td><span class="ph">[test accuracy]</span></td></tr>
+        <tr><td>O2 Classify three of my own photos</td><td>3 images, with top-3 shown</td><td><span class="ph">[n correct of 3]</span></td></tr>
+        <tr><td>O3 Classify a Webots camera image</td><td>Dog in <code>cnn_camera_test.wbt</code></td><td><span class="ph">[label, confidence]</span></td></tr>
+        <tr><td>O4 Detect red, green and blue blocks in Webots</td><td>All 3 found in random layouts</td><td>5 of 5 seeded layouts, 43–91 s</td></tr>
+        <tr><td>O5 Keep the 32 ms control loop unaffected by the CNN</td><td>Inference off the loop; quantised model</td><td><span class="ph">[int8 latency, size ratio]</span></td></tr>
+      </tbody>
+    </table></div>
+  </article>
+
+  <article class="sec">
+    <header><h2>2 Literature review</h2><span class="chip">10 marks</span></header>
+    <p class="bar">Top band: a critical review of 5+ sources on CNNs, Webots or robot vision, and model optimisation (quantisation, pruning).</p>
+    <h3>Suggested themes, each comparing sources rather than listing them</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-l1"><span>2.1 CNNs for image classification: LeNet [3] to AlexNet [4] to VGG [5]. Why small 3×3 filters and depth help, and what CIFAR-10 [1] is good and bad for (tiny 32×32 images, only 10 classes)</span></label></li>
+      <li><label><input type="checkbox" id="c-l2"><span>2.2 Training and regularisation: batch normalisation [6], dropout [7], data augmentation [16], Adam vs SGD [8]. Note where the evidence conflicts, e.g. Adam is faster early but SGD can generalise better</span></label></li>
+      <li><label><input type="checkbox" id="c-l3"><span>2.3 Robot vision in simulation: Webots [11], the e-puck [12], OpenCV [13]. Colour segmentation in HSV vs learned detectors (YOLO [14]): fast and cheap, but brittle to lighting and limited to known colours</span></label></li>
+      <li><label><input type="checkbox" id="c-l4"><span>2.4 Model optimisation for edge devices: integer quantisation [9], pruning [10], distillation [17], efficient architectures [15]. Compare the accuracy cost of each and the hardware needed to benefit</span></label></li>
+      <li><label><input type="checkbox" id="c-l5"><span>2.5 Out-of-distribution inputs [18]: a closed-set classifier always picks one of its classes. This frames your coloured-block result</span></label></li>
+      <li><label><input type="checkbox" id="c-l6"><span>Closing paragraph: the gap your project addresses (a cheap pre-filter plus off-loop quantised CNN on a simulated robot)</span></label></li>
+    </ul>
+  </article>
+
+  <article class="sec">
+    <header><h2>3 Methodology</h2><span class="chip">20 marks</span></header>
+    <p class="bar">Top band: environment setup, the CNN architecture with all layers, the training pipeline, Webots integration, 3 own-image predictions, a robot camera test, and an optimisation proposal with justification. Include code, diagrams and parameters.</p>
+    <h3>Subsections</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-m1"><span>3.1 Environment: Webots R2025a, Python and OpenCV versions, Colab GPU type, TensorFlow version (from the notebook's first cell)</span></label></li>
+      <li><label><input type="checkbox" id="c-m2"><span>3.2 Data: CIFAR-10, the 45k / 5k / 10k split, /255 normalisation, why the test set is not used for decisions</span></label></li>
+      <li><label><input type="checkbox" id="c-m3"><span>3.3 Baseline: the lecture CNN with SGD and Adam, each a fresh model (state that this fixes the lecture notebook's re-compile issue)</span></label></li>
+      <li><label><input type="checkbox" id="c-m4"><span>3.4 Improved CNN: architecture diagram (<code>model_architecture.png</code>), layer table, parameter count, and why each technique was chosen</span></label></li>
+      <li><label><input type="checkbox" id="c-m5"><span>3.5 Training settings: optimiser, learning rate, batch size, early stopping and LR schedule, number of epochs actually run</span></label></li>
+      <li><label><input type="checkbox" id="c-m6"><span>3.6 Inference on new images: centre crop, INTER_AREA resize, BGR to RGB, softmax over logits. Explain why squashing to 32×32 would hurt</span></label></li>
+      <li><label><input type="checkbox" id="c-m7"><span>3.7 Webots world: 3×3 m arena, blocks 0.3×0.3×0.1 m with 2 kg mass, random placement rules, the dog test world. Screenshot of each world</span></label></li>
+      <li><label><input type="checkbox" id="c-m8"><span>3.8 Controller design: the state machine diagram (from the README), proportional steering, IR thresholds, cooldown and rounds</span></label></li>
+      <li><label><input type="checkbox" id="c-m9"><span>3.9 Colour detection: HSV pipeline and the threshold table, with why each limit was chosen (grass, water, sky)</span></label></li>
+      <li><label><input type="checkbox" id="c-m10"><span>3.10 Optimisation proposal: async thread, event-triggered inference, ROI crop, int8 quantisation, lower camera rate. Justify each with a measurement or source</span></label></li>
+      <li><label><input type="checkbox" id="c-m11"><span>3.11 Project and code management: Trello workflow and GitHub commit history (screenshots)</span></label></li>
+      <li><label><input type="checkbox" id="c-m12"><span>Short code excerpts only for key logic (e.g. <code>detect_blocks</code>, <code>AsyncClassifier.submit</code>); full code goes in the appendix or repository</span></label></li>
+    </ul>
+  </article>
+
+  <article class="sec">
+    <header><h2>4 Evaluation of results</h2><span class="chip">20 marks</span></header>
+    <p class="bar">Top band: quantitative CNN accuracy compared with benchmarks, prediction analysis, Webots demo results, optimisation impact (FPS and accuracy trade-offs), with visualisations and error analysis.</p>
+    <h3>Results to report</h3>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-e1"><span>4.1 Accuracy table: baseline SGD, baseline Adam, improved CNN (validation and test), with the 95% confidence interval the notebook prints</span></label></li>
+      <li><label><input type="checkbox" id="c-e2"><span>Compare with published benchmarks: about 70% for the lecture model, and much higher for very deep networks such as ResNets. Explain the gap: model size and training budget</span></label></li>
+      <li><label><input type="checkbox" id="c-e3"><span>4.2 Training curves (<code>training_curves.png</code>): overfitting in the baseline vs the improved model</span></label></li>
+      <li><label><input type="checkbox" id="c-e4"><span>4.3 Error analysis: confusion matrix and the top confused pairs (typically cat/dog, automobile/truck). Explain why, using the misclassified examples</span></label></li>
+      <li><label><input type="checkbox" id="c-e5"><span>4.4 Own images: the 3 predictions with top-3 bars, and why any were wrong (background, framing, out-of-class)</span></label></li>
+      <li><label><input type="checkbox" id="c-e6"><span>4.5 Webots camera: the dog prediction, and the coloured-block predictions as an out-of-distribution result</span></label></li>
+      <li><label><input type="checkbox" id="c-e7"><span>4.6 Colour detection demo: annotated captures, all colours found in 5 of 5 seeded layouts (42.5, 85.6, 90.9, 70.7, 46.7 s), about 0.08 ms of vision per frame</span></label></li>
+      <li><label><input type="checkbox" id="c-e8"><span>4.7 Optimisation impact: the size, median and p95 latency, accuracy and agreement table, plus <code>optimisation_tradeoffs.png</code>. State the host machine</span></label></li>
+      <li><label><input type="checkbox" id="c-e9"><span>Measured CNN latency inside Webots (0.2–0.3 ms per image on the background thread, Apple M4) compared with the 32 ms control step</span></label></li>
+    </ul>
+  </article>
+
+  <article class="sec">
+    <header><h2>5 Discussion and conclusions</h2><span class="chip">20 marks</span></header>
+    <p class="bar">Top band: synthesises findings against the aims; discusses limitations (e.g. real-time constraints), how effective the optimisation was and future deployment; clear contributions.</p>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-d1"><span>Go back to O1–O5: met, partly met or not met, with the evidence</span></label></li>
+      <li><label><input type="checkbox" id="c-d2"><span>Limitations: CIFAR-10 has no "block" class; 52×39 camera resolution; simulation lighting vs the real world; single training seed; latency measured on a laptop, not robot hardware</span></label></li>
+      <li><label><input type="checkbox" id="c-d3"><span>How effective the optimisation was: here the CNN was already fast, so the async design matters most on slow CPUs. Be honest about what the numbers show</span></label></li>
+      <li><label><input type="checkbox" id="c-d4"><span>Proposal for detection in Webots: collect labelled camera images in Webots, fine-tune a small detector (SSD-MobileNet or YOLO), add a "block" class and an unknown-object threshold</span></label></li>
+      <li><label><input type="checkbox" id="c-d5"><span>Future work: pruning, distillation, Coral TPU or ROS 2 offloading, path planning to replace the random search, a real e-puck test</span></label></li>
+      <li><label><input type="checkbox" id="c-d6"><span>Contributions in 3–4 bullet points, then a short final conclusion</span></label></li>
+    </ul>
+  </article>
+
+  <article class="sec">
+    <header><h2>6 Bibliography and references</h2><span class="chip">10 marks</span></header>
+    <p class="bar">Top band: 8+ authoritative sources, IEEE or APA, every in-text citation matched. Read each source you cite and check its details before submitting.</p>
+    <ol class="refs plain">
+      <li>A. Krizhevsky, "Learning multiple layers of features from tiny images," Univ. of Toronto, Tech. Rep., 2009.</li>
+      <li>(Reserved for your Part 1 report, if you cite it.)</li>
+      <li>Y. LeCun, L. Bottou, Y. Bengio and P. Haffner, "Gradient-based learning applied to document recognition," <i>Proc. IEEE</i>, vol. 86, no. 11, pp. 2278–2324, 1998.</li>
+      <li>A. Krizhevsky, I. Sutskever and G. E. Hinton, "ImageNet classification with deep convolutional neural networks," in <i>Proc. NeurIPS</i>, 2012.</li>
+      <li>K. Simonyan and A. Zisserman, "Very deep convolutional networks for large-scale image recognition," in <i>Proc. ICLR</i>, 2015.</li>
+      <li>S. Ioffe and C. Szegedy, "Batch normalization: Accelerating deep network training by reducing internal covariate shift," in <i>Proc. ICML</i>, 2015.</li>
+      <li>N. Srivastava <i>et al.</i>, "Dropout: A simple way to prevent neural networks from overfitting," <i>JMLR</i>, vol. 15, pp. 1929–1958, 2014.</li>
+      <li>D. P. Kingma and J. Ba, "Adam: A method for stochastic optimization," in <i>Proc. ICLR</i>, 2015.</li>
+      <li>B. Jacob <i>et al.</i>, "Quantization and training of neural networks for efficient integer-arithmetic-only inference," in <i>Proc. CVPR</i>, 2018.</li>
+      <li>S. Han, H. Mao and W. J. Dally, "Deep compression: Compressing deep neural networks with pruning, trained quantization and Huffman coding," in <i>Proc. ICLR</i>, 2016.</li>
+      <li>O. Michel, "Webots: Professional mobile robot simulation," <i>Int. J. Advanced Robotic Systems</i>, vol. 1, no. 1, pp. 39–42, 2004.</li>
+      <li>F. Mondada <i>et al.</i>, "The e-puck, a robot designed for education in engineering," in <i>Proc. 9th Conf. Autonomous Robot Systems and Competitions</i>, 2009, pp. 59–65.</li>
+      <li>G. Bradski, "The OpenCV library," <i>Dr. Dobb's Journal of Software Tools</i>, 2000.</li>
+      <li>J. Redmon, S. Divvala, R. Girshick and A. Farhadi, "You only look once: Unified, real-time object detection," in <i>Proc. CVPR</i>, 2016.</li>
+      <li>A. G. Howard <i>et al.</i>, "MobileNets: Efficient convolutional neural networks for mobile vision applications," arXiv:1704.04861, 2017.</li>
+      <li>C. Shorten and T. M. Khoshgoftaar, "A survey on image data augmentation for deep learning," <i>J. Big Data</i>, vol. 6, art. 60, 2019.</li>
+      <li>G. Hinton, O. Vinyals and J. Dean, "Distilling the knowledge in a neural network," arXiv:1503.02531, 2015.</li>
+      <li>D. Hendrycks and K. Gimpel, "A baseline for detecting misclassified and out-of-distribution examples in neural networks," in <i>Proc. ICLR</i>, 2017.</li>
+      <li>Cyberbotics, "Webots reference manual, R2025a." [Online]. Available: https://cyberbotics.com/doc/reference/</li>
+    </ol>
+  </article>
+
+  <article class="sec">
+    <header><h2>Appendices</h2><span class="chip">supports all sections</span></header>
+    <ul class="check">
+      <li><label><input type="checkbox" id="c-a1"><span>A: README setup steps and the hardware notes (e-puck motors, IR sensors, camera)</span></label></li>
+      <li><label><input type="checkbox" id="c-a2"><span>B: Full controller code, or the repository link and the commit hash you submitted</span></label></li>
+      <li><label><input type="checkbox" id="c-a3"><span>C: Trello board and GitHub history screenshots</span></label></li>
+      <li><label><input type="checkbox" id="c-a4"><span>D: Unit test output (23 passed) and an example <code>encounters.csv</code></span></label></li>
+    </ul>
+  </article>
+</div>
+
+<script>
+(function () {
+  const boxes = Array.from(document.querySelectorAll('ul.check input[type="checkbox"]'));
+  const KEY = "report-outline-ticks";
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { saved = {}; }
+  const progress = document.getElementById("progress");
+  function update() {
+    const done = boxes.filter(b => b.checked).length;
+    progress.textContent = done + " of " + boxes.length + " done";
+  }
+  boxes.forEach(b => {
+    if (saved[b.id]) b.checked = true;
+    b.addEventListener("change", () => {
+      saved[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      update();
+    });
+  });
+  update();
+})();
+</script>

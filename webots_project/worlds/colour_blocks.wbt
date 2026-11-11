@@ -1,0 +1,101 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+
+WorldInfo {
+  info [
+    "Colour-block search: an e-puck finds red, green and blue blocks"
+    "(0.3 x 0.3 x 0.1 m, random positions) with OpenCV HSV detection."
+  ]
+  title "Colour block detection"
+  basicTimeStep 32
+}
+Viewpoint {
+  orientation -0.5774 0.5774 0.5774 2.0944
+  position 0 0 5.2
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 3 3
+  floorTileSize 3 3
+  floorAppearance PBRAppearance {
+    baseColor 0.65 0.65 0.65
+    roughness 1
+    metalness 0
+  }
+  wallHeight 0.15
+}
+DEF RED_BLOCK Solid {
+  translation 0.9 0.6 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry DEF BLOCK_BOX Box {
+        size 0.3 0.3 0.1
+      }
+    }
+  ]
+  name "red block"
+  boundingObject USE BLOCK_BOX
+  physics Physics {
+    density -1
+    mass 2
+  }
+}
+DEF GREEN_BLOCK Solid {
+  translation -0.8 0.9 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.8 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry USE BLOCK_BOX
+    }
+  ]
+  name "green block"
+  boundingObject USE BLOCK_BOX
+  physics Physics {
+    density -1
+    mass 2
+  }
+}
+DEF BLUE_BLOCK Solid {
+  translation 0.2 -1 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.1 0.9
+        roughness 1
+        metalness 0
+      }
+      geometry USE BLOCK_BOX
+    }
+  ]
+  name "blue block"
+  boundingObject USE BLOCK_BOX
+  physics Physics {
+    density -1
+    mass 2
+  }
+}
+DEF EPUCK E-puck {
+  translation 0 0 0
+  controller "colour_detector"
+}
+Robot {
+  name "block randomiser"
+  controller "block_randomiser"
+  supervisor TRUE
+}

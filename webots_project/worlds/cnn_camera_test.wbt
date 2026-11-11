@@ -1,0 +1,44 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Dog.proto"
+
+WorldInfo {
+  info [
+    "CNN camera test: the e-puck starts facing a dog (a CIFAR-10 class)."
+    "The controller saves startup_001.png and classifies it with the CNN."
+  ]
+  title "CNN camera test"
+  basicTimeStep 32
+}
+Viewpoint {
+  orientation -0.2 0.2 0.96 1.6
+  position -0.6 -1.6 0.7
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 3 3
+  floorTileSize 3 3
+  floorAppearance PBRAppearance {
+    baseColor 0.65 0.65 0.65
+    roughness 1
+    metalness 0
+  }
+  wallHeight 0.15
+}
+Dog {
+  translation 0.9 0 0
+  rotation 0 0 1 1.5708
+}
+DEF EPUCK E-puck {
+  translation -1.15 0 0
+  controller "colour_detector"
+  camera_width 160
+  camera_height 120
+}
