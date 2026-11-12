@@ -1,0 +1,19 @@
+file,true_class,view,description
+photo_01.jpeg,van,side,white panel van (no CIFAR-10 van class)
+photo_02.jpeg,van,side,white Toyota HiAce van
+photo_03.jpeg,van,front,white Toyota HiAce van
+photo_04.jpeg,van,rear,white Toyota HiAce van
+photo_05.jpeg,automobile,front,white Toyota MPV
+photo_06.jpeg,automobile,side,white Toyota MPV
+photo_07.jpeg,automobile,rear,white Toyota MPV
+photo_08.jpeg,automobile,close-up,white MPV door close-up (wheels cut off)
+photo_09.jpeg,mixed,side,box truck behind a black saloon car
+photo_10.jpeg,truck,side,refrigerated box truck
+photo_11.jpeg,truck,side,box truck with a car bonnet in the foreground
+photo_12.jpeg,automobile,side,red Ferrari
+photo_13.jpeg,automobile,rear,grey Lamborghini
+photo_14.jpeg,truck,front,silver light truck
+photo_15.jpeg,automobile,side,grey Lamborghini
+photo_16.jpeg,automobile,front,grey Lamborghini
+photo_17.jpeg,automobile,rear,red Ferrari
+photo_18.jpeg,automobile,front,red Ferrari
