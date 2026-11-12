@@ -45,6 +45,36 @@ Backend = Callable[[np.ndarray], np.ndarray]
 
 
 @dataclass(frozen=True)
+class ModelSpec:
+    """Which model files to try (best first) and what its outputs mean."""
+
+    name: str
+    class_names: tuple[str, ...]
+    files: tuple[str, ...]
+
+
+CIFAR_MODEL = ModelSpec("CIFAR-10", CLASS_NAMES,
+                        ("cifar10_cnn_int8.tflite", "cifar10_cnn.tflite", "cifar10_cnn.keras"))
+# Trained on auto-labelled Webots images (cnn/webots_shapes.ipynb): is the
+# coloured thing the HSV detector found a block, a ball, a cylinder or nothing?
+SHAPE_CLASSES = ("block", "ball", "cylinder", "background")
+SHAPE_MODEL = ModelSpec("shape", SHAPE_CLASSES, ("webots_shapes_int8.tflite",))
+
+
+def is_not_a_block(verdict: tuple[str, float] | None, min_confidence: float) -> bool:
+    """Should an object the HSV detector found be rejected as "not a block"?
+
+    Only if the shape CNN gave a verdict, that verdict is not "block", and it
+    is at least ``min_confidence`` sure. No verdict (model off or failed) or an
+    unsure one keeps the HSV result, so the robot never does worse than before.
+    """
+    if verdict is None:
+        return False
+    label, confidence = verdict
+    return label != "block" and confidence >= min_confidence
+
+
+@dataclass(frozen=True)
 class Prediction:
     tag: str  # what the frame was (e.g. "red_block_003"), for the log
     label: str = ""
@@ -73,13 +103,13 @@ def softmax(logits: np.ndarray) -> np.ndarray:
 
 
 class _TFLiteBackend:
-    def __init__(self, model_path: Path) -> None:
+    def __init__(self, model_path: Path, n_classes: int) -> None:
         interpreter_cls = _import_tflite_interpreter()
         self._interp = interpreter_cls(model_path=str(model_path), num_threads=1)
         self._interp.allocate_tensors()
         self._inp = self._interp.get_input_details()[0]
         self._out = self._interp.get_output_details()[0]
-        _check_shapes(tuple(self._inp["shape"]), tuple(self._out["shape"]))
+        _check_shapes(tuple(self._inp["shape"]), tuple(self._out["shape"]), n_classes)
 
     def __call__(self, batch: np.ndarray) -> np.ndarray:
         x = batch
@@ -97,20 +127,20 @@ class _TFLiteBackend:
 
 
 class _KerasBackend:
-    def __init__(self, model_path: Path) -> None:
+    def __init__(self, model_path: Path, n_classes: int) -> None:
         import tensorflow as tf  # heavy import, only when needed
 
         self._model = tf.keras.models.load_model(model_path)
-        _check_shapes(tuple(self._model.input_shape), tuple(self._model.output_shape))
+        _check_shapes(tuple(self._model.input_shape), tuple(self._model.output_shape), n_classes)
 
     def __call__(self, batch: np.ndarray) -> np.ndarray:
         return np.asarray(self._model(batch, training=False))[0]
 
 
-def _check_shapes(inp: tuple, out: tuple) -> None:
-    if tuple(inp[1:]) != (INPUT_SIZE, INPUT_SIZE, 3) or out[-1] != len(CLASS_NAMES):
+def _check_shapes(inp: tuple, out: tuple, n_classes: int) -> None:
+    if tuple(inp[1:]) != (INPUT_SIZE, INPUT_SIZE, 3) or out[-1] != n_classes:
         raise ValueError(f"model expects input {inp} / gives output {out}; "
-                         f"need (*, {INPUT_SIZE}, {INPUT_SIZE}, 3) -> (*, {len(CLASS_NAMES)})")
+                         f"need (*, {INPUT_SIZE}, {INPUT_SIZE}, 3) -> (*, {n_classes})")
 
 
 def _import_tflite_interpreter() -> type:
@@ -133,23 +163,21 @@ def _import_tflite_interpreter() -> type:
     return tf.lite.Interpreter
 
 
-def load_backend(model_dir: Path) -> tuple[Backend | None, str]:
+def load_backend(model_dir: Path, spec: ModelSpec = CIFAR_MODEL) -> tuple[Backend | None, str]:
     """Return (backend, description). backend is None if nothing could load.
 
-    Tries the int8 model first, then float32 TFLite, then Keras. If a preferred
-    model failed and a fallback loaded, the description says so loudly.
+    Tries the spec's files in order (for CIFAR-10: int8 TFLite, float32 TFLite,
+    then Keras). If a preferred model failed and a fallback loaded, the
+    description says so loudly.
     """
-    candidates = [
-        (model_dir / "cifar10_cnn_int8.tflite", _TFLiteBackend),
-        (model_dir / "cifar10_cnn.tflite", _TFLiteBackend),
-        (model_dir / "cifar10_cnn.keras", _KerasBackend),
-    ]
+    candidates = [(model_dir / name, _KerasBackend if name.endswith(".keras") else _TFLiteBackend)
+                  for name in spec.files]
     errors = []
     for path, backend_cls in candidates:
         if not path.is_file():
             continue
         try:
-            backend = backend_cls(path)
+            backend = backend_cls(path, len(spec.class_names))
         except Exception as exc:  # any load failure: record it and try the next file
             errors.append(f"{path.name}: {type(exc).__name__}: {exc}")
             continue
@@ -159,8 +187,10 @@ def load_backend(model_dir: Path) -> tuple[Backend | None, str]:
         return backend, description
     if errors:
         return None, "could not load a model -> " + " | ".join(errors)
+    if not spec.files:
+        return None, "no model files configured"
     return None, (f"no model file in {model_dir} (run the notebook and copy "
-                  "cifar10_cnn_int8.tflite there)")
+                  f"{spec.files[0]} there)")
 
 
 class AsyncClassifier:
@@ -172,9 +202,11 @@ class AsyncClassifier:
     ``submit`` in one run.) Queues handle all hand-over between the two threads.
     """
 
-    def __init__(self, model_dir: Path, backend: Backend | None = None) -> None:
+    def __init__(self, model_dir: Path, backend: Backend | None = None,
+                 spec: ModelSpec = CIFAR_MODEL) -> None:
+        self.spec = spec
         if backend is None:
-            self.backend, self.description = load_backend(model_dir)
+            self.backend, self.description = load_backend(model_dir, spec)
         else:  # injected backend (used by the unit tests)
             self.backend, self.description = backend, "injected backend"
         self.enabled = self.backend is not None
@@ -184,7 +216,7 @@ class AsyncClassifier:
         self.failures = 0
         self._consecutive_failures = 0
         if self.enabled:
-            threading.Thread(target=self._worker, name="cnn-worker", daemon=True).start()
+            threading.Thread(target=self._worker, name=f"cnn-worker-{spec.name}", daemon=True).start()
 
     def submit(self, tag: str, bgr_square: np.ndarray) -> bool:
         """Queue a frame for classification. Returns False if the CNN is off."""
@@ -214,15 +246,16 @@ class AsyncClassifier:
     def _classify(self, tag: str, frame: np.ndarray) -> Prediction:
         start = time.perf_counter()
         probs = softmax(self.backend(preprocess(frame)))
-        if probs.shape != (len(CLASS_NAMES),) or not np.isfinite(probs).all():
+        names = self.spec.class_names
+        if probs.shape != (len(names),) or not np.isfinite(probs).all():
             raise ValueError(f"model returned invalid output {probs!r}")
         latency = (time.perf_counter() - start) * 1000.0
         order = np.argsort(probs)[::-1][:3]
         return Prediction(
             tag=tag,
-            label=CLASS_NAMES[order[0]],
+            label=names[order[0]],
             confidence=float(probs[order[0]]),
-            top3=tuple((CLASS_NAMES[i], float(probs[i])) for i in order),
+            top3=tuple((names[i], float(probs[i])) for i in order),
             latency_ms=latency,
         )
 

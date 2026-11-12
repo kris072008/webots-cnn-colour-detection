@@ -16,6 +16,9 @@ Options
                              embedded CPU (default 0 = the real model speed).
 --stop-after=S               stop after S simulated seconds and write the timing
                              report (default: run until Webots stops the robot).
+--shape-check=on|off         not a timing option: off makes the robot ignore the
+                             shape CNN's verdict (the HSV-only behaviour), for a
+                             before/after comparison. Default on.
 
 The controller measures the wall-clock compute time of every control step
 (from ``robot.step()`` returning to the next call), and writes a summary to
@@ -47,10 +50,12 @@ class Options:
     cnn_trigger: str = "event"
     emulate_ms: float = 0.0
     stop_after: float | None = None
+    shape_check: bool = True  # act on the shape CNN (reject balls/cylinders); not a timing option
 
     @property
     def is_benchmark(self) -> bool:
-        return self != Options()
+        """True if any timing-experiment option differs from normal operation."""
+        return (self.cnn_mode, self.cnn_trigger, self.emulate_ms, self.stop_after) != ("async", "event", 0.0, None)
 
 
 def parse_options(argv: list[str]) -> Options:
@@ -66,7 +71,7 @@ def parse_options(argv: list[str]) -> Options:
             raise ValueError(f"controller argument --{key} given more than once")
         values[key] = value
 
-    unknown = set(values) - {"cnn-mode", "cnn-trigger", "emulate-ms", "stop-after"}
+    unknown = set(values) - {"cnn-mode", "cnn-trigger", "emulate-ms", "stop-after", "shape-check"}
     if unknown:
         raise ValueError(f"unknown controller argument(s): {', '.join(sorted(unknown))}")
 
@@ -82,7 +87,10 @@ def parse_options(argv: list[str]) -> Options:
     stop_after = _number(values, "stop-after", None)
     if stop_after is not None and stop_after <= 0:
         raise ValueError("--stop-after must be > 0")
-    return Options(mode, trigger, emulate_ms, stop_after)
+    shape_check = values.get("shape-check", "on")
+    if shape_check not in ("on", "off"):
+        raise ValueError(f"--shape-check must be on or off, not {shape_check!r}")
+    return Options(mode, trigger, emulate_ms, stop_after, shape_check == "on")
 
 
 def _number(values: dict[str, str], key: str, default: str | None) -> float | None:

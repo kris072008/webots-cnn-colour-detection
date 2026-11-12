@@ -1,0 +1,192 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+
+WorldInfo {
+  info [
+    "Dataset world: blocks, balls and cylinders in random colours."
+    "The e-puck is a supervisor that teleports itself, photographs the"
+    "objects and labels every crop from the known object positions."
+  ]
+  title "Shape dataset collection"
+  basicTimeStep 32
+}
+Viewpoint {
+  orientation -0.5774 0.5774 0.5774 2.0944
+  position 0 0 5.2
+}
+DEF SKY TexturedBackground {
+}
+DEF SKY_LIGHT TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 3 3
+  floorTileSize 3 3
+  floorAppearance PBRAppearance {
+    baseColor 0.65 0.65 0.65
+    roughness 1
+    metalness 0
+  }
+  wallHeight 0.15
+}
+DEF BLOCK_1 Solid {
+  translation 0 0 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.3 0.3 0.1
+      }
+    }
+  ]
+  name "block_1"
+}
+DEF BLOCK_2 Solid {
+  translation 0 0 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.3 0.3 0.1
+      }
+    }
+  ]
+  name "block_2"
+}
+DEF BLOCK_3 Solid {
+  translation 0 0 0.05
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.3 0.3 0.1
+      }
+    }
+  ]
+  name "block_3"
+}
+DEF BALL_1 Solid {
+  translation 0 0 0.08
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.08
+        subdivision 3
+      }
+    }
+  ]
+  name "ball_1"
+}
+DEF BALL_2 Solid {
+  translation 0 0 0.08
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.08
+        subdivision 3
+      }
+    }
+  ]
+  name "ball_2"
+}
+DEF BALL_3 Solid {
+  translation 0 0 0.08
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Sphere {
+        radius 0.08
+        subdivision 3
+      }
+    }
+  ]
+  name "ball_3"
+}
+DEF CYLINDER_1 Solid {
+  translation 0 0 0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.2
+        radius 0.07
+      }
+    }
+  ]
+  name "cylinder_1"
+}
+DEF CYLINDER_2 Solid {
+  translation 0 0 0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.2
+        radius 0.07
+      }
+    }
+  ]
+  name "cylinder_2"
+}
+DEF CYLINDER_3 Solid {
+  translation 0 0 0.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Cylinder {
+        height 0.2
+        radius 0.07
+      }
+    }
+  ]
+  name "cylinder_3"
+}
+DEF EPUCK E-puck {
+  translation 0 0 0
+  controller "shape_dataset_collector"
+  controllerArgs [
+    "--split=train"
+  ]
+  supervisor TRUE
+}

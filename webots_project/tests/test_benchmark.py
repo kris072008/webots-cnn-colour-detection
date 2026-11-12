@@ -62,3 +62,11 @@ def test_classify_now_blocks_and_returns_result_via_poll():
     assert (time.perf_counter() - start) >= 0.019  # ran on this thread
     (pred,) = clf.poll()
     assert pred.tag == "s1" and pred.label == CLASS_NAMES[2] and not pred.error
+
+
+def test_shape_check_option_is_not_a_timing_option():
+    off = benchmark.parse_options(["--shape-check=off"])
+    assert off.shape_check is False and not off.is_benchmark
+    assert benchmark.parse_options([""]).shape_check is True
+    with pytest.raises(ValueError):
+        benchmark.parse_options(["--shape-check=maybe"])

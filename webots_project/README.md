@@ -11,24 +11,32 @@ Tested with **Webots R2025a**, Python 3.12–3.14, OpenCV 4.x on macOS.
 ```
 webots_project/
 ├── worlds/
-│   ├── colour_blocks.wbt        # main demo: arena + 3 blocks (random positions) + e-puck
-│   └── cnn_camera_test.wbt      # e-puck facing a dog (CIFAR-10 class) for the CNN camera test
+│   ├── colour_blocks.wbt               # main demo: arena + 3 blocks (random positions) + e-puck
+│   ├── colour_blocks_distractors.wbt   # same + a red ball, green cylinder, blue ball (shape CNN test)
+│   ├── cnn_camera_test.wbt             # e-puck facing a dog (CIFAR-10 class) for the CNN camera test
+│   └── shape_dataset.wbt               # dataset world: blocks, balls, cylinders in random colours
 ├── controllers/
 │   ├── colour_detector/
 │   │   ├── colour_detector.py   # robot controller: state machine, motors, sensors, logging
 │   │   ├── vision.py            # OpenCV detection (pure functions, unit-tested)
-│   │   ├── classifier.py        # optional CNN inference on a background thread
+│   │   ├── classifier.py        # CNN inference on background threads (CIFAR-10 + shape model)
 │   │   ├── benchmark.py         # opt-in timing experiment (controllerArgs)
-│   │   ├── models/              # put cifar10_cnn_int8.tflite here (from the notebook)
+│   │   ├── models/              # cifar10_cnn_int8.tflite and webots_shapes_int8.tflite
 │   │   └── images/              # created at run time: snapshots + encounters.csv
-│   └── block_randomiser/
-│       └── block_randomiser.py  # supervisor: random, non-overlapping block positions
-└── tests/
-    ├── test_vision.py           # detector + classifier tests, no Webots needed
-    └── test_benchmark.py        # timing-experiment tests (39 tests in total)
+│   ├── block_randomiser/
+│   │   └── block_randomiser.py  # supervisor: random, non-overlapping block (and distractor) positions
+│   ├── shape_dataset_collector/
+│   │   ├── shape_dataset_collector.py  # supervisor: builds the auto-labelled shape dataset
+│   │   └── projection.py               # pinhole projection of known objects into the camera image
+│   └── demo_recorder/
+│       └── demo_recorder.py     # supervisor: demo video with live captions + ground truth for scoring
+└── tests/                       # 59 unit tests, no Webots needed
+    ├── test_vision.py           # detector + classifier
+    ├── test_benchmark.py        # timing experiment
+    └── test_projection.py       # dataset labelling maths + shape model hook
 ```
 
-The training notebook is `../cnn/cifar10_cnn.ipynb`.
+The training notebooks are `../cnn/cifar10_cnn.ipynb` (CIFAR-10) and `../cnn/webots_shapes.ipynb` (the shape model trained on Webots images).
 
 ## Setup
 
@@ -93,7 +101,7 @@ stateDiagram-v2
 | SEARCH | Drives forward with IR obstacle avoidance. |
 | SCAN | Turns 360° on the spot to look around when nothing has been seen for a while. |
 | APPROACH | **Proportional steering**: the wheel speed difference is proportional to how far the block's centroid is from the image centre. It slows down when the block is off to the side. |
-| INSPECT | Stops, saves images, logs the encounter, sends the crop to the CNN. |
+| INSPECT | Stops, saves images, logs the candidate and sends the crop to both CNNs. After 1 s it decides: if the shape CNN is at least 60% sure the object is a ball, cylinder or background it is **not counted** (the robot keeps searching and avoids that colour for longer); otherwise the block is confirmed. Without the shape model the HSV result stands. `--shape-check=off` in `controllerArgs` gives the colour-only behaviour. |
 | LEAVE | Reverses (stopping early if the rear sensors ps3/ps4 see something) and turns away. That colour is then ignored until all three colours have been found ("rounds"), plus a 12 s cooldown, so the robot goes looking for the *other* blocks instead of revisiting the nearest one. |
 
 ### Vision: HSV colour segmentation (`vision.py`)
@@ -154,6 +162,7 @@ These were measured in Webots R2025a, headless, on Apple M4:
 * **Search reliability:** with fixed seeds 1–5 for the block layout, the robot found all three colours in **5 of 5 layouts**, taking 42.5, 85.6, 90.9, 70.7 and 46.7 s of simulated time.
 * **Vision cost:** about 0.08 ms per 52×39 frame.
 * **CNN in the loop:** the int8 TFLite model ran in 0.2–0.3 ms per image on the background thread, with no effect on the 32 ms control step.
+* **Shape check against distractors** (`colour_blocks_distractors.wbt`, 5 layouts × 300 s): with `--shape-check=off` the robot counted all 28 distractors it inspected (a red ball, green cylinder, blue ball) as blocks and announced a wrong "all found" in 4 of 5 layouts. With the shape check it rejected all 26 it met, wrongly rejected one real block (a very close, off-centre view), and every "all found" it announced was correct. It is slower (147 s mean to a correct first round) and in one layout did not find the red block within 300 s. Data: `../cnn/results/webots_runs/distractors/`.
 * **Timing experiment** (seed 1, 90 s, 2,813 control steps): with 50 ms added to every inference to emulate a slow embedded CPU, running the CNN *inside* the control step on every frame missed the 32 ms deadline in **1,406 steps (50%)**, worst step 135 ms. The deployed design (background thread, event-triggered) missed **0**. Results, figure and the script to re-run it: `../cnn/results/webots_runs/timing/`.
 * **CNN model:** 86.47% test accuracy on the 10,000 CIFAR-10 test images (Keras float32); the deployed full-int8 TFLite model scores 86.57% at 328 kB (3.7× smaller than float32). Full numbers: `../cnn/results/`.
 * **CNN on Webots camera images:** in `cnn_camera_test.wbt` the dog was classified as **horse (95%)**, with dog third (1%). The blocks are classified mostly as airplane or ship, because a coloured box is not a CIFAR-10 class. Both are out-of-distribution results, discussed in the report. Logs and images: `../cnn/results/webots_runs/`.
@@ -185,6 +194,7 @@ Normal runs are unaffected. To measure whether CNN inference delays the control 
 | `--cnn-trigger=event\|every-frame` | Only at blocks, key C and start-up (default), or every processed frame |
 | `--emulate-ms=N` | Add N ms to each inference to emulate a slow embedded CPU |
 | `--stop-after=S` | Stop after S simulated seconds and write `images/step_timing.json` |
+| `--shape-check=on\|off` | Not a timing option: off ignores the shape CNN (colour-only behaviour, for comparison) |
 
 The report gives each step's compute time, the 99th-percentile and worst step, and how many steps exceeded 32 ms.
 

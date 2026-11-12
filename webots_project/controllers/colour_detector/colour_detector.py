@@ -41,7 +41,7 @@ from controller import Keyboard, Robot
 
 import benchmark
 import vision
-from classifier import INPUT_SIZE, AsyncClassifier
+from classifier import INPUT_SIZE, SHAPE_MODEL, AsyncClassifier, ModelSpec, is_not_a_block
 
 # ---------------------------------------------------------------------------
 # Parameters (all tunable in one place)
@@ -76,6 +76,10 @@ INSPECT_SECONDS = 1.0
 REVERSE_SECONDS = 0.6
 TURN_AWAY_SECONDS = 1.4
 COLOUR_COOLDOWN_SECONDS = 12.0  # ignore a colour this long after inspecting it
+# Shape check: at the end of INSPECT the shape CNN's verdict decides whether the
+# coloured thing really is a block. Below this confidence the HSV result stands.
+SHAPE_REJECT_CONFIDENCE = 0.6
+SHAPE_EXTRA_WAIT_SECONDS = 0.5  # wait this much longer for a late verdict before deciding
 SCAN_AFTER_SECONDS = 8.0  # no wanted block seen this long -> 360 degree scan
 SUMMARY_EVERY_SECONDS = 60.0
 
@@ -125,8 +129,12 @@ class EncounterLog:
     def block_found(self, sim_time: float, det: vision.Detection, image: str) -> None:
         self._row(sim_time, "block_found", det.colour, f"{det.area_fraction:.3f}", image, "", "")
 
-    def prediction(self, sim_time: float, tag: str, label: str, confidence: float) -> None:
-        self._row(sim_time, "cnn_prediction", "", "", f"{tag}.png", label, f"{confidence:.3f}")
+    def prediction(self, sim_time: float, tag: str, label: str, confidence: float,
+                   event: str = "cnn_prediction") -> None:
+        self._row(sim_time, event, "", "", f"{tag}.png", label, f"{confidence:.3f}")
+
+    def decision(self, sim_time: float, tag: str | None, event: str, label: str, confidence: float) -> None:
+        self._row(sim_time, event, "", "", f"{tag}.png" if tag else "", label, f"{confidence:.3f}")
 
     def error(self, sim_time: float, tag: str, message: str) -> None:
         self._row(sim_time, "cnn_error", "", "", f"{tag}.png", message, "")
@@ -182,6 +190,23 @@ class ColourDetectorRobot:
                 self.classifier.backend, options.emulate_ms)
         status = "ON - " if self.classifier.enabled else "OFF - "
         print(f"[init] camera {self.width}x{self.height}, CNN {status}{self.classifier.description}")
+        # Second, optional model trained on Webots images: block / ball / cylinder / background.
+        # It is left out of the timing experiment, so that measures one model as before.
+        if options.is_benchmark:  # not even loaded: no extra thread during timing runs
+            self.shape_classifier = AsyncClassifier(MODEL_DIR, spec=ModelSpec("shape", SHAPE_MODEL.class_names, ()))
+            self.shape_classifier.description = "off during the timing experiment"
+        else:
+            self.shape_classifier = AsyncClassifier(MODEL_DIR, spec=SHAPE_MODEL)
+        if self.shape_classifier.enabled:
+            print(f"[init] shape CNN ON - {self.shape_classifier.description}")
+        else:
+            print(f"[init] WARNING: shape CNN OFF - {self.shape_classifier.description}")
+        self.shape_predictions: dict[str, str] = {}
+        self.shape_results: dict[str, tuple[str, float]] = {}  # tag -> (label, confidence)
+        self.pending: tuple[vision.Detection, str | None] | None = None  # candidate being inspected
+        self.rejections: dict[str, int] = {}  # colour -> objects rejected as "not a block"
+        if not options.shape_check:
+            print("[init] shape check OFF: every coloured object counts as a block (HSV only)")
         if options.is_benchmark:
             print(f"[benchmark] {options}")
             if not self.classifier.enabled and (options.emulate_ms or options.cnn_mode == "sync"
@@ -390,7 +415,13 @@ class ColourDetectorRobot:
     def _step_inspect(self) -> None:
         self.stop()
         if self.time_in_state() >= INSPECT_SECONDS:
-            self.cooldown_until[self.target_colour] = self.now() + COLOUR_COOLDOWN_SECONDS
+            if self.waiting_for_verdict() and self.time_in_state() < INSPECT_SECONDS + SHAPE_EXTRA_WAIT_SECONDS:
+                return  # the shape CNN has not answered yet (slow CPU): give it a little longer
+            rejected = self.decide_pending()
+            # After a rejection the colour is avoided for longer each time, so the
+            # robot searches elsewhere instead of returning to the same ball.
+            factor = 1 + self.rejections.get(self.target_colour, 0) if rejected else 1
+            self.cooldown_until[self.target_colour] = self.now() + COLOUR_COOLDOWN_SECONDS * factor
             self.change_state(State.LEAVE)
 
     def _step_leave(self) -> None:
@@ -434,13 +465,18 @@ class ColourDetectorRobot:
         self.classify(tag, crop)
         return tag, saved
 
-    def classify(self, tag: str, crop) -> None:
-        """Send a crop to the CNN: off the loop (default) or, for the timing
-        experiment only, inside the control step."""
-        if self.options.cnn_mode == "sync":
-            self.classifier.classify_now(tag, crop)
-        else:
-            self.classifier.submit(tag, crop)
+    def classify(self, tag: str, crop, with_shape: bool = True) -> None:
+        """Send a crop to the CNN(s): off the loop (default) or, for the timing
+        experiment only, inside the control step. The shape model also gets
+        every capture, but not the timing experiment's per-frame crops."""
+        models = [self.classifier]
+        if with_shape and self.shape_classifier.enabled:
+            models.append(self.shape_classifier)
+        for model in models:
+            if self.options.cnn_mode == "sync":
+                model.classify_now(tag, crop)
+            else:
+                model.submit(tag, crop)
 
     def classify_every_frame(self) -> None:
         """Timing experiment only: classify every processed frame (no images saved)."""
@@ -449,18 +485,65 @@ class ColourDetectorRobot:
         det = self.last_detections[0] if self.last_detections else None
         crop = vision.square_crop(self.last_frame, det.bbox if det else None)
         self.frames_sent += 1
-        self.classify(f"{FRAME_TAG_PREFIX}{self.vision_calls:05d}", crop)
+        self.classify(f"{FRAME_TAG_PREFIX}{self.vision_calls:05d}", crop, with_shape=False)
 
     def record_encounter(self, det: vision.Detection) -> None:
-        print(f"[found] {det.colour.upper()} block at {self.now():.1f}s "
-              f"(fills {det.area_fraction:.0%} of the image)")
+        """Arrived at a coloured object: photograph it and send it to both CNNs.
+
+        It only counts as found when INSPECT ends (decide_pending), once the
+        shape CNN has had its say."""
+        print(f"[found] {det.colour.upper()} object at {self.now():.1f}s "
+              f"(fills {det.area_fraction:.0%} of the image) - checking its shape")
         result = self.capture(f"{det.colour}_block", det)
         tag, saved = result if result else (None, False)
-        # The block WAS found (detection succeeded) even if saving the photo failed;
-        # the CSV records an empty image path in that case so nothing is hidden.
-        self.encounters.append(Encounter(det.colour, self.now(), tag))
+        # The HSV detection is logged even if saving the photo failed; the CSV
+        # then records an empty image path, so nothing is hidden.
         self.log.block_found(self.now(), det, f"{tag}.png" if saved else "")
+        self.pending = (det, tag)
+
+    def waiting_for_verdict(self) -> bool:
+        """True if the shape check is on and its verdict for the candidate is still missing."""
+        if self.pending is None or not self.options.shape_check or not self.shape_classifier.enabled:
+            return False
+        self.handle_predictions()
+        tag = self.pending[1]
+        return tag is not None and tag not in self.shape_results
+
+    def decide_pending(self) -> bool:
+        """End of INSPECT: confirm the candidate as a block, or reject it if the
+        shape CNN is confident it is something else. Returns True if rejected."""
+        if self.pending is None:
+            return False
+        det, tag = self.pending
+        self.pending = None
+        self.handle_predictions()  # collect a result that arrived this step
+        verdict = self.shape_results.get(tag) if tag else None
+        if self.options.shape_check and is_not_a_block(verdict, SHAPE_REJECT_CONFIDENCE):
+            label, conf = verdict
+            self.rejections[det.colour] = self.rejections.get(det.colour, 0) + 1
+            print(f"[shape] {det.colour.upper()} object is a {label} ({conf:.0%}), not a block "
+                  "- not counted, keep searching")
+            self.log.decision(self.now(), tag, "rejected_not_block", label, conf)
+            return True
+        if verdict is None:
+            if not self.options.shape_check:
+                reason = "shape check off"
+            elif not self.shape_classifier.enabled:
+                reason = "shape CNN off"
+            else:
+                reason = "no shape verdict in time"
+            print(f"[shape] {tag}: {reason} - accepting the HSV detection")
+            self.log.decision(self.now(), tag, "block_confirmed", f"(no verdict: {reason})", 0.0)
+        else:
+            self.log.decision(self.now(), tag, "block_confirmed", *verdict)
+        print(f"[found] {det.colour.upper()} block confirmed"
+              + (f" (shape CNN: {verdict[0]} {verdict[1]:.0%})" if verdict else ""))
+        self.encounters.append(Encounter(det.colour, self.now(), tag))
         self.found_this_round.add(det.colour)
+        self.check_round_complete()
+        return False
+
+    def check_round_complete(self) -> None:
         if self.found_this_round >= set(vision.HSV_RANGES):
             print(f"[found] round {self.round_number} complete: all colours found "
                   f"in {self.now():.1f}s - starting a new round")
@@ -487,6 +570,17 @@ class ColourDetectorRobot:
                   f"top-3: {top}  [{pred.latency_ms:.1f} ms, off the control loop]")
             self.predictions[pred.tag] = f"{pred.label} ({pred.confidence:.0%})"
             self.log.prediction(self.now(), pred.tag, pred.label, pred.confidence)
+        for pred in self.shape_classifier.poll():
+            if pred.error:
+                print(f"[shape] {pred.tag}: inference failed - {pred.error}")
+                self.log.error(self.now(), pred.tag, f"shape model: {pred.error}")
+                continue
+            top = ", ".join(f"{name} {p:.0%}" for name, p in pred.top3)
+            print(f"[shape] {pred.tag}: {pred.label} ({pred.confidence:.0%})  top-3: {top}  "
+                  f"[{pred.latency_ms:.1f} ms]")
+            self.shape_predictions[pred.tag] = f"{pred.label} ({pred.confidence:.0%})"
+            self.shape_results[pred.tag] = (pred.label, pred.confidence)
+            self.log.prediction(self.now(), pred.tag, pred.label, pred.confidence, "shape_prediction")
 
     def handle_keyboard(self) -> None:
         key = self.keyboard.getKey()
@@ -505,16 +599,24 @@ class ColourDetectorRobot:
         print("=" * 60)
         print(f"SUMMARY at {self.now():.1f}s simulated time (round {self.round_number})")
         print("  blocks found : " + ", ".join(f"{c} x{n}" for c, n in counts.items()))
+        if self.rejections:
+            print("  not blocks   : " + ", ".join(f"{c} x{n}" for c, n in self.rejections.items())
+                  + " (rejected by the shape CNN)")
         print("  not found yet: " + (", ".join(missing) if missing else "none - all colours found"))
         print(f"  captures     : {self.capture_count} (saved in {IMAGE_DIR.name}/)")
         print(f"  vision cost  : {avg_vision:.2f} ms per frame over {self.vision_calls} frames")
         print(f"  CNN          : {'ON' if self.classifier.enabled else 'OFF'} - "
               f"{self.classifier.description}")
         for tag, pred in self.predictions.items():
-            print(f"    {tag:<22}: {pred}")
+            shape = self.shape_predictions.get(tag)
+            print(f"    {tag:<22}: {pred}" + (f"   | shape: {shape}" if shape else ""))
         if self.classifier.dropped_frames or self.classifier.failures:
             print(f"    dropped {self.classifier.dropped_frames} stale frames, "
                   f"{self.classifier.failures} failures")
+        shape = self.shape_classifier
+        print(f"  shape CNN    : {'ON' if shape.enabled else 'OFF'} - {shape.description}")
+        if shape.dropped_frames or shape.failures:
+            print(f"    shape CNN dropped {shape.dropped_frames} stale frames, {shape.failures} failures")
         print("=" * 60)
 
     # --------------------------------------------------------------------- main

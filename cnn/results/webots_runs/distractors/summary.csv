@@ -1,0 +1,3 @@
+shape_check,runs,inspections,of_them_distractors,distractors_counted_as_blocks,real_blocks_rejected,runs_completing_round_1,round_1_all_real_blocks,mean_time_correct_round_1_s,shape_label_correct
+off,5,69,28,28,0,5,1,47.7,70/70
+on,5,55,26,0,1,4,4,147.1,54/55

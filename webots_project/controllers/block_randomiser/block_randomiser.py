@@ -18,6 +18,8 @@ import sys
 from controller import Supervisor
 
 BLOCK_DEFS = ("RED_BLOCK", "GREEN_BLOCK", "BLUE_BLOCK")
+# Optional same-coloured non-block objects (worlds/colour_blocks_distractors.wbt).
+DISTRACTOR_DEFS = ("DISTRACTOR_1", "DISTRACTOR_2", "DISTRACTOR_3")
 ARENA_HALF = 1.5  # 3 x 3 m arena
 BLOCK_HALF_DIAGONAL = math.hypot(0.15, 0.15)  # 0.3 x 0.3 m footprint
 WALL_MARGIN = BLOCK_HALF_DIAGONAL + 0.1  # keep a gap so the robot can pass
@@ -27,9 +29,10 @@ BLOCK_Z = 0.05  # half the block height: resting on the floor
 MAX_TRIES = 1000
 
 
-def random_layout(rng: random.Random, robot_xy: tuple[float, float]) -> list[tuple[float, float]]:
-    """Rejection sampling: draw random (x, y) points until each block is inside
-    the walls, far enough from the robot and from every block already placed."""
+def random_layout(rng: random.Random, robot_xy: tuple[float, float],
+                  count: int = len(BLOCK_DEFS)) -> list[tuple[float, float]]:
+    """Rejection sampling: draw random (x, y) points until each object is inside
+    the walls, far enough from the robot and from every object already placed."""
     limit = ARENA_HALF - WALL_MARGIN
     placed: list[tuple[float, float]] = []
     for _ in range(MAX_TRIES):
@@ -39,9 +42,39 @@ def random_layout(rng: random.Random, robot_xy: tuple[float, float]) -> list[tup
         if any(math.dist(p, q) < MIN_GAP for q in placed):
             continue
         placed.append(p)
-        if len(placed) == len(BLOCK_DEFS):
+        if len(placed) == count:
             return placed
     raise RuntimeError("could not find a valid block layout; reduce MIN_GAP")
+
+
+def place_objects(supervisor: Supervisor, rng: random.Random,
+                  seed: int | None = None) -> dict[str, tuple[float, float]]:
+    """Put the blocks (and any distractors in the world) at a random valid
+    layout. Returns {DEF name: (x, y)} of everything placed."""
+    robot_node = supervisor.getFromDef("EPUCK")
+    robot_xy = (0.0, 0.0)
+    if robot_node is None:
+        print("[randomiser] WARNING: no node with DEF EPUCK - assuming the robot starts at (0, 0)")
+    else:
+        robot_xy = tuple(robot_node.getField("translation").getSFVec3f()[:2])
+
+    distractors = [d for d in DISTRACTOR_DEFS if supervisor.getFromDef(d) is not None]
+    names = list(BLOCK_DEFS) + distractors
+    layout = random_layout(rng, robot_xy, len(names))
+    placed: dict[str, tuple[float, float]] = {}
+    for def_name, (x, y) in zip(names, layout):
+        node = supervisor.getFromDef(def_name)
+        if node is None:
+            print(f"[randomiser] WARNING: no node with DEF {def_name} in the world")
+            continue
+        z = BLOCK_Z if def_name in BLOCK_DEFS else node.getField("translation").getSFVec3f()[2]
+        node.getField("translation").setSFVec3f([x, y, z])
+        node.getField("rotation").setSFRotation([0, 0, 1, rng.uniform(0, math.pi)])
+        node.resetPhysics()
+        placed[def_name] = (x, y)
+        print(f"[randomiser] {def_name:<12} -> x={x:+.2f} m, y={y:+.2f} m")
+    print(f"[randomiser] placed {len(placed)} of {len(names)} objects (seed={seed})")
+    return placed
 
 
 def main() -> None:
@@ -55,26 +88,7 @@ def main() -> None:
                   "seed - using a random layout")
     rng = random.Random(seed)
 
-    robot_node = supervisor.getFromDef("EPUCK")
-    robot_xy = (0.0, 0.0)
-    if robot_node is None:
-        print("[randomiser] WARNING: no node with DEF EPUCK - assuming the robot starts at (0, 0)")
-    else:
-        robot_xy = tuple(robot_node.getField("translation").getSFVec3f()[:2])
-
-    layout = random_layout(rng, robot_xy)
-    placed = 0
-    for def_name, (x, y) in zip(BLOCK_DEFS, layout):
-        node = supervisor.getFromDef(def_name)
-        if node is None:
-            print(f"[randomiser] WARNING: no node with DEF {def_name} in the world")
-            continue
-        node.getField("translation").setSFVec3f([x, y, BLOCK_Z])
-        node.getField("rotation").setSFRotation([0, 0, 1, rng.uniform(0, math.pi)])
-        node.resetPhysics()
-        placed += 1
-        print(f"[randomiser] {def_name:<12} -> x={x:+.2f} m, y={y:+.2f} m")
-    print(f"[randomiser] placed {placed} of {len(BLOCK_DEFS)} blocks (seed={seed})")
+    place_objects(supervisor, rng, seed)
     supervisor.step(int(supervisor.getBasicTimeStep()))
 
 

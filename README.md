@@ -4,7 +4,8 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 | Folder | What it contains |
 |---|---|
-| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`) |
+| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`). `gradcam.ipynb`: what the CNN looks at. `webots_shapes.ipynb`: a CNN trained on auto-labelled Webots images (`webots_shapes/`) |
+| [`cnn/results/videos/`](cnn/results/videos/) | Demo videos: the normal search, and the distractor world without and with the shape check |
 | [`webots_project/`](webots_project/) | Webots R2025a package: e-puck colour-block search with OpenCV HSV detection and off-loop CNN inference. See its [README](webots_project/README.md) and [DEMO](webots_project/DEMO.md). |
 
 ## Results (CPU training run, seed 42)
@@ -23,6 +24,8 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 **My own photos** ([`cnn/own_photos.ipynb`](cnn/own_photos.ipynb)): on 18 phone photos of vehicles, every side view was classified correctly (5 of 5), but only 2 of 7 front and rear views, a viewpoint bias from CIFAR-10. The int8 robot model agreed with the full model on all 18.
 
+**A CNN trained on the robot's own world** ([`cnn/webots_shapes.ipynb`](cnn/webots_shapes.ipynb)): a supervisor labels Webots camera crops automatically, and a CNN learns to tell blocks from same-coloured balls and cylinders. On 25 unseen layouts it scores 99.2% (3 seeds), against 94.5% for the best hand-made features; the deployed int8 model scores 99.4%. On the robot, in a world with distractors, colour detection alone counted 28 of 28 distractors as blocks; with the shape check the robot counted 0 of 26 and kept searching ([`distractors/`](cnn/results/webots_runs/distractors/)).
+
 **Does the CNN slow the robot down?** With 50 ms added to every inference to emulate a slow embedded CPU, running the CNN inside the control loop on every frame missed the 32 ms deadline in 50% of steps (worst step 135 ms). The deployed design, with a background thread and event-triggered inference, missed none ([`timing/`](cnn/results/webots_runs/timing/)).
 
 Figures, model files and the model card are in [`cnn/results/`](cnn/results/). Webots run logs and captures are in [`cnn/results/webots_runs/`](cnn/results/webots_runs/).
@@ -32,7 +35,7 @@ Figures, model files and the model card are in [`cnn/results/`](cnn/results/). W
 ```bash
 cd webots_project
 python3 -m pip install opencv-python numpy pytest
-python3 -m pytest tests -q          # 39 unit tests
+python3 -m pytest tests -q          # 59 unit tests
 ```
 
 Open `webots_project/worlds/colour_blocks.wbt` in Webots and press ▶.

@@ -1,0 +1,6 @@
+method,test_acc_mean,test_acc_sd,ci95_lo_seed42,ci95_hi_seed42,macro_f1_seed42,hsv_test_acc_mean,hsv_test_acc_sd
+HSV shape features + random forest,0.9448,0.0017,0.9347,0.9563,0.9453,0.9302,0.0022
+HOG + linear SVM,0.9091,0.0,0.8945,0.922,0.9085,0.925,0.0
+CNN: frozen CIFAR features,0.9281,0.0041,0.9139,0.9334,0.9239,0.9514,0.0029
+CNN: fine-tuned from CIFAR,0.992,0.0021,0.9835,0.9945,0.9895,0.9901,0.0014
+CNN: from scratch,0.992,0.0016,0.9897,0.9967,0.9936,0.9953,0.0033

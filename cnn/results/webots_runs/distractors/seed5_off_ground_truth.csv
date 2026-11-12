@@ -1,0 +1,15 @@
+sim_time_s,tag,hsv_colour,object_def,true_object,distance_m
+10.94,blue_block_002,blue,BLUE_BLOCK,block,0.33
+35.33,green_block_003,green,GREEN_BLOCK,block,0.33
+47.68,red_block_004,red,RED_BLOCK,block,0.33
+59.26,green_block_005,green,GREEN_BLOCK,block,0.37
+70.66,red_block_006,red,RED_BLOCK,block,0.32
+106.24,blue_block_007,blue,BLUE_BLOCK,block,0.33
+130.30,green_block_008,green,GREEN_BLOCK,block,0.33
+142.46,red_block_009,red,RED_BLOCK,block,0.32
+177.47,blue_block_010,blue,BLUE_BLOCK,block,0.33
+201.66,green_block_011,green,GREEN_BLOCK,block,0.33
+213.89,red_block_012,red,RED_BLOCK,block,0.33
+248.83,blue_block_013,blue,BLUE_BLOCK,block,0.33
+273.09,green_block_014,green,GREEN_BLOCK,block,0.33
+285.31,red_block_015,red,RED_BLOCK,block,0.33

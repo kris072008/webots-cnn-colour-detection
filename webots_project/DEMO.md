@@ -23,12 +23,15 @@ The demo takes about 3 minutes. Rehearse it once the day before.
 | 6 | `round 1 complete` and the SUMMARY | Blocks found, vision cost of about 0.08 ms per frame, CNN predictions and latency |
 | 7 | Optional: open `worlds/cnn_camera_test.wbt` | The robot faces a dog (a CIFAR-10 class) and the CNN classifies its camera frame |
 | 8 | Optional: click the 3D view and press C | Manual capture and classify |
+| 9 | Optional, the strongest moment: open `worlds/colour_blocks_distractors.wbt` | A red ball, a green cylinder and a blue ball share the blocks' colours. Watch the console: `[found] BLUE object ... - checking its shape`, then `[shape] BLUE object is a ball (..%), not a block - not counted, keep searching`. The robot goes on to find the real blue block. |
+| 10 | Optional before/after: in the e-puck's `controllerArgs` add `--shape-check=off` and run again | The HSV-only robot counts the ball as "the blue block" and stops looking. That is the colour-only weakness the shape CNN fixes. |
 
 ## Talking points
 
 - **Why HSV rather than RGB:** one hue range per colour works in both light and shade, which the lecture's RGB filter could not do.
 - **Why the CNN mislabels the blocks:** a coloured box is not one of the 10 CIFAR-10 classes, and the model has no "unknown" output. That motivates the proposal to train a detector on Webots images.
 - **Optimisation:** inference runs off the control loop, only on events, on an int8 model. The robot never stalls.
+- **The proposal, implemented:** the shape CNN was trained only on Webots images that a supervisor labelled automatically. It decides whether the coloured thing is really a block, so the robot is no longer fooled by a ball of the same colour.
 
 ## If something goes wrong
 
