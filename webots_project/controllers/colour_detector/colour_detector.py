@@ -27,8 +27,11 @@ Hardware used (e-puck, see README.md): 2 wheel motors (max 6.28 rad/s),
 from __future__ import annotations
 
 import csv
+import json
 import math
-from dataclasses import dataclass
+import sys
+import time
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
@@ -36,6 +39,7 @@ from pathlib import Path
 import cv2 as cv
 from controller import Keyboard, Robot
 
+import benchmark
 import vision
 from classifier import INPUT_SIZE, AsyncClassifier
 
@@ -79,6 +83,8 @@ CONTROLLER_DIR = Path(__file__).resolve().parent
 IMAGE_DIR = CONTROLLER_DIR / "images"
 MODEL_DIR = CONTROLLER_DIR / "models"
 LOG_PATH = IMAGE_DIR / "encounters.csv"
+TIMING_PATH = IMAGE_DIR / "step_timing.json"
+FRAME_TAG_PREFIX = "frame_"  # timing experiment: per-frame predictions are counted, not printed
 
 
 class State(Enum):
@@ -145,7 +151,8 @@ class EncounterLog:
 
 
 class ColourDetectorRobot:
-    def __init__(self) -> None:
+    def __init__(self, options: benchmark.Options | None = None) -> None:
+        self.options = options = options or benchmark.Options()
         self.robot = Robot()
         self.left_motor = self._device("left wheel motor")
         self.right_motor = self._device("right wheel motor")
@@ -170,8 +177,21 @@ class ColourDetectorRobot:
         IMAGE_DIR.mkdir(parents=True, exist_ok=True)
         self.log = EncounterLog(LOG_PATH)
         self.classifier = AsyncClassifier(MODEL_DIR)
+        if options.emulate_ms > 0 and self.classifier.enabled:
+            self.classifier.backend = benchmark.EmulatedLatencyBackend(
+                self.classifier.backend, options.emulate_ms)
         status = "ON - " if self.classifier.enabled else "OFF - "
         print(f"[init] camera {self.width}x{self.height}, CNN {status}{self.classifier.description}")
+        if options.is_benchmark:
+            print(f"[benchmark] {options}")
+            if not self.classifier.enabled and (options.emulate_ms or options.cnn_mode == "sync"
+                                                or options.cnn_trigger == "every-frame"):
+                print("[benchmark] WARNING: the CNN is OFF, so this run times NO inference "
+                      "and its report is marked invalid")
+        self.step_ms: list[float] = []  # compute time of every control step
+        self.frames_sent = 0  # timing experiment: frames handed to the CNN
+        self.frame_results = 0  # ... and results received (ok or failed)
+        self.frame_errors = 0
 
         # FSM
         self.state = State.SEARCH
@@ -411,8 +431,25 @@ class ColourDetectorRobot:
             return tag, False
         print(f"[capture] saved {raw_path.name}" if saved
               else f"[capture] FAILED to write images for {tag} in {IMAGE_DIR}")
-        self.classifier.submit(tag, crop)
+        self.classify(tag, crop)
         return tag, saved
+
+    def classify(self, tag: str, crop) -> None:
+        """Send a crop to the CNN: off the loop (default) or, for the timing
+        experiment only, inside the control step."""
+        if self.options.cnn_mode == "sync":
+            self.classifier.classify_now(tag, crop)
+        else:
+            self.classifier.submit(tag, crop)
+
+    def classify_every_frame(self) -> None:
+        """Timing experiment only: classify every processed frame (no images saved)."""
+        if not self.new_frame or not self.classifier.enabled:
+            return
+        det = self.last_detections[0] if self.last_detections else None
+        crop = vision.square_crop(self.last_frame, det.bbox if det else None)
+        self.frames_sent += 1
+        self.classify(f"{FRAME_TAG_PREFIX}{self.vision_calls:05d}", crop)
 
     def record_encounter(self, det: vision.Detection) -> None:
         print(f"[found] {det.colour.upper()} block at {self.now():.1f}s "
@@ -433,6 +470,14 @@ class ColourDetectorRobot:
 
     def handle_predictions(self) -> None:
         for pred in self.classifier.poll():
+            if pred.tag.startswith(FRAME_TAG_PREFIX):  # timing experiment: too many to print
+                self.frame_results += 1
+                if pred.error:
+                    self.frame_errors += 1
+                    self.log.error(self.now(), pred.tag, pred.error)
+                    if self.frame_errors == 1:  # say so once; the total is in the report
+                        print(f"[cnn] per-frame inference FAILED: {pred.error}")
+                continue
             if pred.error:
                 print(f"[cnn] {pred.tag}: inference failed - {pred.error}")
                 self.log.error(self.now(), pred.tag, pred.error)
@@ -473,12 +518,43 @@ class ColourDetectorRobot:
         print("=" * 60)
 
     # --------------------------------------------------------------------- main
+    def write_timing_report(self, wall_s: float) -> None:
+        """Summarise per-step compute time vs the 32 ms deadline (see benchmark.py)."""
+        try:
+            stats = benchmark.step_timing_stats(self.step_ms, TIME_STEP, wall_s, self.now())
+        except ValueError as exc:
+            print(f"[timing] no report: {exc}")
+            return
+        valid = self.classifier.enabled and self.classifier.failures == 0
+        stats.update(options=asdict(self.options),
+                     cnn=self.classifier.description,
+                     cnn_failures=self.classifier.failures,
+                     frames_sent_to_cnn=self.frames_sent,
+                     frame_results=self.frame_results,
+                     dropped_frames=self.classifier.dropped_frames,
+                     blocks_found=len(self.encounters),
+                     valid=valid)
+        if not valid:
+            print("[timing] WARNING: report marked INVALID - the CNN was off or inferences "
+                  f"failed ({self.classifier.failures} failures)")
+        print(f"[timing] {stats['steps']} steps: mean {stats['mean_ms']} ms, "
+              f"p99 {stats['p99_ms']} ms, max {stats['max_ms']} ms, "
+              f"missed 32 ms deadline {stats['missed_deadlines']}x ({stats['missed_pct']}%)")
+        try:
+            TIMING_PATH.write_text(json.dumps(stats, indent=2))
+        except OSError as exc:
+            print(f"[timing] could not write {TIMING_PATH.name}: {exc}")
+
     def run(self) -> None:
         step_count = 0
+        wall_start = time.perf_counter()
         try:
             while self.robot.step(TIME_STEP) != -1:
+                step_start = time.perf_counter()
                 step_count += 1
                 self.update_vision(step_count)
+                if self.options.cnn_trigger == "every-frame":
+                    self.classify_every_frame()
                 if not self.startup_snapshot_done and self.last_frame is not None:
                     # One photo at start-up: in cnn_camera_test.wbt the robot
                     # faces a CIFAR-10 object (a dog) for the CNN camera test.
@@ -490,14 +566,24 @@ class ColourDetectorRobot:
                 if self.now() >= self.next_summary:
                     self.print_summary()
                     self.next_summary += SUMMARY_EVERY_SECONDS
+                self.step_ms.append((time.perf_counter() - step_start) * 1000.0)
+                if self.options.stop_after is not None and self.now() >= self.options.stop_after:
+                    print(f"[benchmark] stopping after {self.now():.1f}s simulated time")
+                    break
         finally:
             try:
                 self.stop()
                 self.handle_predictions()
                 self.print_summary()
+                if self.options.is_benchmark:
+                    self.write_timing_report(time.perf_counter() - wall_start)
             finally:
                 self.log.close()
 
 
 if __name__ == "__main__":
-    ColourDetectorRobot().run()
+    try:
+        options = benchmark.parse_options(sys.argv[1:])
+    except ValueError as exc:
+        sys.exit(f"[init] bad controllerArgs: {exc}")
+    ColourDetectorRobot(options).run()

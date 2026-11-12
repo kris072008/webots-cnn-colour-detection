@@ -21,6 +21,8 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 | TFLite float32 | 1226 kB | 0.12 ms | 86.47% |
 | TFLite full int8 (used on the robot) | 328 kB | 0.09 ms | 86.57% |
 
+**Does the CNN slow the robot down?** With 50 ms added to every inference to emulate a slow embedded CPU, running the CNN inside the control loop on every frame missed the 32 ms deadline in 50% of steps (worst step 135 ms). The deployed design, with a background thread and event-triggered inference, missed none ([`timing/`](cnn/results/webots_runs/timing/)).
+
 Figures, model files and the model card are in [`cnn/results/`](cnn/results/). Webots run logs and captures are in [`cnn/results/webots_runs/`](cnn/results/webots_runs/).
 
 ## Quick start
@@ -28,7 +30,7 @@ Figures, model files and the model card are in [`cnn/results/`](cnn/results/). W
 ```bash
 cd webots_project
 python3 -m pip install opencv-python numpy pytest
-python3 -m pytest tests -q          # 23 unit tests
+python3 -m pytest tests -q          # 39 unit tests
 ```
 
 Open `webots_project/worlds/colour_blocks.wbt` in Webots and press ▶.

@@ -18,12 +18,14 @@ webots_project/
 │   │   ├── colour_detector.py   # robot controller: state machine, motors, sensors, logging
 │   │   ├── vision.py            # OpenCV detection (pure functions, unit-tested)
 │   │   ├── classifier.py        # optional CNN inference on a background thread
+│   │   ├── benchmark.py         # opt-in timing experiment (controllerArgs)
 │   │   ├── models/              # put cifar10_cnn_int8.tflite here (from the notebook)
 │   │   └── images/              # created at run time: snapshots + encounters.csv
 │   └── block_randomiser/
 │       └── block_randomiser.py  # supervisor: random, non-overlapping block positions
 └── tests/
-    └── test_vision.py           # 23 unit tests, no Webots needed
+    ├── test_vision.py           # detector + classifier tests, no Webots needed
+    └── test_benchmark.py        # timing-experiment tests (39 tests in total)
 ```
 
 The training notebook is `../cnn/cifar10_cnn.ipynb`.
@@ -152,6 +154,7 @@ These were measured in Webots R2025a, headless, on Apple M4:
 * **Search reliability:** with fixed seeds 1–5 for the block layout, the robot found all three colours in **5 of 5 layouts**, taking 42.5, 85.6, 90.9, 70.7 and 46.7 s of simulated time.
 * **Vision cost:** about 0.08 ms per 52×39 frame.
 * **CNN in the loop:** the int8 TFLite model ran in 0.2–0.3 ms per image on the background thread, with no effect on the 32 ms control step.
+* **Timing experiment** (seed 1, 90 s, 2,813 control steps): with 50 ms added to every inference to emulate a slow embedded CPU, running the CNN *inside* the control step on every frame missed the 32 ms deadline in **1,406 steps (50%)**, worst step 135 ms. The deployed design (background thread, event-triggered) missed **0**. Results, figure and the script to re-run it: `../cnn/results/webots_runs/timing/`.
 * **CNN model:** 86.47% test accuracy on the 10,000 CIFAR-10 test images (Keras float32); the deployed full-int8 TFLite model scores 86.57% at 328 kB (3.7× smaller than float32). Full numbers: `../cnn/results/`.
 * **CNN on Webots camera images:** in `cnn_camera_test.wbt` the dog was classified as **horse (95%)**, with dog third (1%). The blocks are classified mostly as airplane or ship, because a coloured box is not a CIFAR-10 class. Both are out-of-distribution results, discussed in the report. Logs and images: `../cnn/results/webots_runs/`.
 
@@ -166,6 +169,24 @@ python3 -m pytest tests -q
 
 The tests check every colour, the shaded red face, and that grass, water, sky and grey floor are **not** detected.
 They also check noise rejection, steering offset signs, camera-buffer conversion, square cropping, the CNN preprocessing format, and the background CNN thread: results, error reporting, auto-disable after repeated failures, and a missing model.
+`test_benchmark.py` checks the timing experiment: argument parsing and rejection of bad values, the deadline statistics, the emulated latency and synchronous inference.
+
+## Timing experiment (optional)
+
+Normal runs are unaffected. To measure whether CNN inference delays the control loop, put options in the e-puck's `controllerArgs`, for example:
+
+```
+--cnn-mode=sync --cnn-trigger=every-frame --emulate-ms=50 --stop-after=90
+```
+
+| Option | Meaning |
+|---|---|
+| `--cnn-mode=async\|sync` | Background thread (default) or inside the control step |
+| `--cnn-trigger=event\|every-frame` | Only at blocks, key C and start-up (default), or every processed frame |
+| `--emulate-ms=N` | Add N ms to each inference to emulate a slow embedded CPU |
+| `--stop-after=S` | Stop after S simulated seconds and write `images/step_timing.json` |
+
+The report gives each step's compute time, the 99th-percentile and worst step, and how many steps exceeded 32 ms.
 
 ## Troubleshooting
 

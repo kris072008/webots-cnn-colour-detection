@@ -166,8 +166,10 @@ def load_backend(model_dir: Path) -> tuple[Backend | None, str]:
 class AsyncClassifier:
     """Background-thread CNN. ``submit`` never blocks the control loop.
 
-    Only the main thread calls submit/poll; only the worker increments
-    ``failures``. Queues handle all hand-over between the two threads.
+    Only the main thread calls submit/poll; only the worker classifies, so only
+    it updates the failure counters. (``classify_now``, used only by the timing
+    experiment, classifies on the main thread instead and is never mixed with
+    ``submit`` in one run.) Queues handle all hand-over between the two threads.
     """
 
     def __init__(self, model_dir: Path, backend: Backend | None = None) -> None:
@@ -180,6 +182,7 @@ class AsyncClassifier:
         self._results: queue.Queue[Prediction] = queue.Queue()
         self.dropped_frames = 0
         self.failures = 0
+        self._consecutive_failures = 0
         if self.enabled:
             threading.Thread(target=self._worker, name="cnn-worker", daemon=True).start()
 
@@ -223,18 +226,34 @@ class AsyncClassifier:
             latency_ms=latency,
         )
 
+    def classify_now(self, tag: str, bgr_square: np.ndarray) -> bool:
+        """Classify on the calling thread (blocks until done).
+
+        Only for the timing experiment in ``benchmark.py``, which compares this
+        naive in-loop inference against ``submit``. The result is collected
+        with ``poll`` exactly as for asynchronous inference.
+        """
+        if not self.enabled or bgr_square.size == 0:
+            return False
+        self._run_one(tag, bgr_square)
+        return True
+
+    def _run_one(self, tag: str, frame: np.ndarray) -> None:
+        """Classify one frame and queue the result; count and report failures."""
+        try:
+            result = self._classify(tag, frame)
+            self._consecutive_failures = 0
+        except Exception as exc:  # never let a failure pass silently
+            self.failures += 1
+            self._consecutive_failures += 1
+            result = Prediction(tag=tag, error=f"{type(exc).__name__}: {exc}")
+            if self._consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                self.enabled = False
+                self.description += (f"  [DISABLED after {self._consecutive_failures} "
+                                     "failed inferences]")
+        self._results.put(result)
+
     def _worker(self) -> None:
-        consecutive_failures = 0
         while self.enabled:
             tag, frame = self._requests.get()
-            try:
-                result = self._classify(tag, frame)
-                consecutive_failures = 0
-            except Exception as exc:  # never let the thread die silently
-                self.failures += 1
-                consecutive_failures += 1
-                result = Prediction(tag=tag, error=f"{type(exc).__name__}: {exc}")
-                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                    self.enabled = False
-                    self.description += f"  [DISABLED after {consecutive_failures} failed inferences]"
-            self._results.put(result)
+            self._run_one(tag, frame)

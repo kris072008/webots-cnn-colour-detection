@@ -1,0 +1,26 @@
+{
+  "steps": 2813,
+  "deadline_ms": 32,
+  "mean_ms": 0.119,
+  "p50_ms": 0.068,
+  "p99_ms": 0.389,
+  "max_ms": 20.738,
+  "missed_deadlines": 0,
+  "missed_pct": 0.0,
+  "sim_seconds": 90.02,
+  "wall_seconds": 1.61,
+  "sustainable_rate_hz": 8390.9,
+  "options": {
+    "cnn_mode": "sync",
+    "cnn_trigger": "every-frame",
+    "emulate_ms": 0.0,
+    "stop_after": 90.0
+  },
+  "cnn": "cifar10_cnn_int8.tflite (TFLiteBackend)",
+  "cnn_failures": 0,
+  "frames_sent_to_cnn": 1406,
+  "frame_results": 1406,
+  "dropped_frames": 0,
+  "blocks_found": 6,
+  "valid": true
+}

@@ -1,0 +1,7 @@
+config,file,cnn_mode,cnn_trigger,emulate_ms,steps,mean_ms,p99_ms,max_ms,missed_deadlines,missed_pct,dropped_frames,blocks_found
+A,A_async_event_real.json,async,event,0.0,2813,0.053,0.133,17.679,0,0.0,0,6
+B,B_sync_frame_real.json,sync,every-frame,0.0,2813,0.119,0.389,20.738,0,0.0,0,6
+C,C_async_event_50.json,async,event,50.0,2813,0.052,0.128,18.856,0,0.0,0,6
+D,D_async_frame_50.json,async,every-frame,50.0,2813,0.056,0.153,17.174,0,0.0,1388,6
+E,E_sync_event_50.json,sync,event,50.0,2813,0.203,0.161,79.226,7,0.25,0,6
+F,F_sync_frame_50.json,sync,every-frame,50.0,2813,28.608,60.414,134.984,1406,49.98,0,6
