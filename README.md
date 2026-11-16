@@ -39,7 +39,3 @@ python3 -m pytest tests -q          # 59 unit tests
 ```
 
 Open `webots_project/worlds/colour_blocks.wbt` in Webots and press ▶.
-
-## AI use
-
-This project was developed with substantial help from an AI assistant (Claude, Anthropic). The AI wrote and tested much of the code and ran the experiments. This is declared to the module lecturer.
