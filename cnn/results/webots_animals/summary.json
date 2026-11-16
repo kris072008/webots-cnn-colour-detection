@@ -1,0 +1,150 @@
+{
+  "views": 192,
+  "known_views": 96,
+  "known_correct": 43,
+  "known_said_animal": 93,
+  "per_animal": {
+    "cat": [
+      0,
+      24,
+      "horse"
+    ],
+    "dog": [
+      0,
+      24,
+      "horse"
+    ],
+    "deer": [
+      21,
+      24,
+      "deer"
+    ],
+    "horse": [
+      22,
+      24,
+      "horse"
+    ]
+  },
+  "by_view": {
+    "front": [
+      6,
+      20
+    ],
+    "three-quarter": [
+      8,
+      16
+    ],
+    "side": [
+      20,
+      40
+    ],
+    "rear": [
+      9,
+      20
+    ]
+  },
+  "unknown_views": 96,
+  "unknown_said_animal": 83,
+  "unknown_labels": {
+    "cow": {
+      "horse": 13,
+      "deer": 4,
+      "airplane": 4,
+      "dog": 2,
+      "bird": 1
+    },
+    "fox": {
+      "deer": 12,
+      "horse": 9,
+      "airplane": 2,
+      "bird": 1
+    },
+    "rabbit": {
+      "deer": 16,
+      "airplane": 3,
+      "bird": 3,
+      "horse": 1,
+      "cat": 1
+    },
+    "sheep": {
+      "horse": 7,
+      "deer": 7,
+      "bird": 4,
+      "airplane": 4,
+      "dog": 2
+    }
+  },
+  "mean_conf_known": 0.884,
+  "mean_conf_unknown": 0.753,
+  "auroc_known_vs_unknown": 0.714,
+  "unknown_conf_ge_90": 36,
+  "int8_agreement": 0.9688,
+  "background_swap": {
+    "original": {
+      "cat": [
+        0,
+        24,
+        "horse"
+      ],
+      "dog": [
+        0,
+        24,
+        "horse"
+      ],
+      "deer": [
+        21,
+        24,
+        "deer"
+      ],
+      "horse": [
+        22,
+        24,
+        "horse"
+      ]
+    },
+    "grey": {
+      "cat": [
+        4,
+        24,
+        "dog"
+      ],
+      "dog": [
+        12,
+        24,
+        "dog"
+      ],
+      "deer": [
+        4,
+        24,
+        "cat"
+      ],
+      "horse": [
+        20,
+        24,
+        "horse"
+      ]
+    },
+    "indoor beige": {
+      "cat": [
+        7,
+        24,
+        "cat"
+      ],
+      "dog": [
+        5,
+        24,
+        "horse"
+      ],
+      "deer": [
+        0,
+        24,
+        "cat"
+      ],
+      "horse": [
+        18,
+        24,
+        "horse"
+      ]
+    }
+  }
+}

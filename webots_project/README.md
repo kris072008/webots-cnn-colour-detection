@@ -14,7 +14,8 @@ webots_project/
 │   ├── colour_blocks.wbt               # main demo: arena + 3 blocks (random positions) + e-puck
 │   ├── colour_blocks_distractors.wbt   # same + a red ball, green cylinder, blue ball (shape CNN test)
 │   ├── cnn_camera_test.wbt             # e-puck facing a dog (CIFAR-10 class) for the CNN camera test
-│   └── shape_dataset.wbt               # dataset world: blocks, balls, cylinders in random colours
+│   ├── shape_dataset.wbt               # dataset world: blocks, balls, cylinders in random colours
+│   └── animal_safari.wbt               # all 8 Webots animals, photographed by a supervisor e-puck
 ├── controllers/
 │   ├── colour_detector/
 │   │   ├── colour_detector.py   # robot controller: state machine, motors, sensors, logging
@@ -28,12 +29,16 @@ webots_project/
 │   ├── shape_dataset_collector/
 │   │   ├── shape_dataset_collector.py  # supervisor: builds the auto-labelled shape dataset
 │   │   └── projection.py               # pinhole projection of known objects into the camera image
-│   └── demo_recorder/
-│       └── demo_recorder.py     # supervisor: demo video with live captions + ground truth for scoring
-└── tests/                       # 59 unit tests, no Webots needed
+│   ├── demo_recorder/
+│   │   └── demo_recorder.py     # supervisor: demo video with live captions + ground truth for scoring
+│   └── animal_photographer/
+│       ├── animal_photographer.py  # supervisor: photographs each animal from 24 directions
+│       └── silhouette.py           # background subtraction: the animal's mask and box
+└── tests/                       # 62 unit tests, no Webots needed
     ├── test_vision.py           # detector + classifier
     ├── test_benchmark.py        # timing experiment
-    └── test_projection.py       # dataset labelling maths + shape model hook
+    ├── test_projection.py       # dataset labelling maths + shape model hook
+    └── test_silhouette.py       # animal background subtraction
 ```
 
 The training notebooks are `../cnn/cifar10_cnn.ipynb` (CIFAR-10) and `../cnn/webots_shapes.ipynb` (the shape model trained on Webots images).
@@ -166,6 +171,7 @@ These were measured in Webots R2025a, headless, on Apple M4:
 * **Timing experiment** (seed 1, 90 s, 2,813 control steps): with 50 ms added to every inference to emulate a slow embedded CPU, running the CNN *inside* the control step on every frame missed the 32 ms deadline in **1,406 steps (50%)**, worst step 135 ms. The deployed design (background thread, event-triggered) missed **0**. Results, figure and the script to re-run it: `../cnn/results/webots_runs/timing/`.
 * **CNN model:** 86.47% test accuracy on the 10,000 CIFAR-10 test images (Keras float32); the deployed full-int8 TFLite model scores 86.57% at 328 kB (3.7× smaller than float32). Full numbers: `../cnn/results/`.
 * **CNN on Webots camera images:** in `cnn_camera_test.wbt` the dog was classified as **horse (95%)**, with dog third (1%). The blocks are classified mostly as airplane or ship, because a coloured box is not a CIFAR-10 class. Both are out-of-distribution results, discussed in the report. Logs and images: `../cnn/results/webots_runs/`.
+* **Every Webots animal** (`animal_safari.wbt`, 8 animals × 24 directions, 192 images labelled by background subtraction): deer and horse were named correctly in 43 of 48 views, cat and dog in none (both mostly "horse"). With the background replaced by grey, the dog was right in 12 of 24 views and the deer dropped from 21 to 4: the CNN leans on the scenery. Re-run with Webots (`--batch` on `worlds/animal_safari.wbt` writes `../cnn/webots_animals/`), then `../cnn/webots_animals.ipynb`. Results: `../cnn/results/webots_animals/`.
 
 ## Tests
 

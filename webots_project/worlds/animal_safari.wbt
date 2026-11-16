@@ -1,0 +1,75 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Cat.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Cow.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Deer.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Dog.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Fox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Horse.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Rabbit.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Sheep.proto"
+
+WorldInfo {
+  info [
+    "Animal world: the eight animals in the Webots object library."
+    "Cat, deer, dog and horse are CIFAR-10 classes; cow, fox, rabbit and sheep are not."
+    "The e-puck is a supervisor (animal_photographer): it shows one animal at a time,"
+    "drives its camera round it and saves what it sees for the CNN."
+  ]
+  title "Animal safari"
+  basicTimeStep 32
+}
+Viewpoint {
+  orientation -0.25 0.2 0.95 1.9
+  position 1.5 -9 4.5
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 40 40
+  floorTileSize 2 2
+  floorAppearance PBRAppearance {
+    baseColor 0.42 0.6 0.3
+    roughness 1
+    metalness 0
+  }
+  wallHeight 0.05
+}
+DEF CAT Cat {
+  translation -6.0 3 0
+}
+DEF COW Cow {
+  translation -4.0 3 0
+}
+DEF DEER Deer {
+  translation -2.0 3 0
+}
+DEF DOG Dog {
+  translation 0.0 3 0
+}
+DEF FOX Fox {
+  translation 2.0 3 0
+}
+DEF HORSE Horse {
+  translation 4.0 3 0
+}
+DEF RABBIT Rabbit {
+  translation 6.0 3 0
+}
+DEF SHEEP Sheep {
+  translation 8.0 3 0
+}
+DEF EPUCK E-puck {
+  translation 0 -3 0
+  rotation 0 0 1 1.5708
+  controller "animal_photographer"
+  supervisor TRUE
+  camera_width 160
+  camera_height 120
+}

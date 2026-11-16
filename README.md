@@ -4,7 +4,7 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 | Folder | What it contains |
 |---|---|
-| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`). `gradcam.ipynb`: what the CNN looks at. `webots_shapes.ipynb`: a CNN trained on auto-labelled Webots images (`webots_shapes/`) |
+| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`). `gradcam.ipynb`: what the CNN looks at. `webots_shapes.ipynb`: a CNN trained on auto-labelled Webots images (`webots_shapes/`). `webots_animals.ipynb`: the CNN on all 8 Webots animals seen by the robot (`webots_animals/`) |
 | [`cnn/results/videos/`](cnn/results/videos/) | Demo videos: the normal search, and the distractor world without and with the shape check |
 | [`webots_project/`](webots_project/) | Webots R2025a package: e-puck colour-block search with OpenCV HSV detection and off-loop CNN inference. See its [README](webots_project/README.md) and [DEMO](webots_project/DEMO.md). |
 
@@ -26,6 +26,8 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 **A CNN trained on the robot's own world** ([`cnn/webots_shapes.ipynb`](cnn/webots_shapes.ipynb)): a supervisor labels Webots camera crops automatically, and a CNN learns to tell blocks from same-coloured balls and cylinders. On 25 unseen layouts it scores 99.2% (3 seeds), against 94.5% for the best hand-made features; the deployed int8 model scores 99.4%. On the robot, in a world with distractors, colour detection alone counted 28 of 28 distractors as blocks; with the shape check the robot counted 0 of 26 and kept searching ([`distractors/`](cnn/results/webots_runs/distractors/)).
 
+**Every Webots animal, through the robot's camera** ([`cnn/webots_animals.ipynb`](cnn/webots_animals.ipynb)): the robot photographed all eight animals in the Webots library from 24 directions. Deer and horse were right in 43 of 48 views, cat and dog in none (both mostly "horse"). Replacing only the background with grey made the dog right in 12 of 24 views and dropped the deer from 21 to 4, so the CNN reads the scenery as much as the animal.
+
 **Does the CNN slow the robot down?** With 50 ms added to every inference to emulate a slow embedded CPU, running the CNN inside the control loop on every frame missed the 32 ms deadline in 50% of steps (worst step 135 ms). The deployed design, with a background thread and event-triggered inference, missed none ([`timing/`](cnn/results/webots_runs/timing/)).
 
 Figures, model files and the model card are in [`cnn/results/`](cnn/results/). Webots run logs and captures are in [`cnn/results/webots_runs/`](cnn/results/webots_runs/).
@@ -35,7 +37,7 @@ Figures, model files and the model card are in [`cnn/results/`](cnn/results/). W
 ```bash
 cd webots_project
 python3 -m pip install opencv-python numpy pytest
-python3 -m pytest tests -q          # 59 unit tests
+python3 -m pytest tests -q          # 62 unit tests
 ```
 
 Open `webots_project/worlds/colour_blocks.wbt` in Webots and press ▶.
