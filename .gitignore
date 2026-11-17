@@ -8,3 +8,4 @@ cnn/outputs/
 *.zip
 webots_project/controllers/object_finder/images/
 webots_project/worlds/.*.wbproj
+~$*
