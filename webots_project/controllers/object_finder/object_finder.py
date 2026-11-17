@@ -17,7 +17,10 @@ How it works
    15% further), the int8 CIFAR-10 CNN names each on its background thread
    (classifier.py), and the answers vote. If fewer than two views agree, or the
    winner's mean confidence is below 60%, the robot answers "unsure".
-4. Show: the checklist and the current answer are drawn on the 3D view.
+4. Show: the checklist and the current answer are drawn on the 3D view. If
+   TensorFlow is available (see runtime.ini), a Grad-CAM heatmap of the best
+   view of each named object is computed on a background thread with the full
+   Keras model and shown on the robot's display, also drawn on the 3D view.
 
 The robot is a supervisor only so that, at the end, its answers can be scored
 against what each object really is. Navigation and recognition use only the
@@ -42,6 +45,7 @@ import vision  # noqa: E402  (same HSV detection and cropping as the block searc
 from classifier import AsyncClassifier  # noqa: E402  (same CNN, same background thread)
 
 from lidar_objects import find_objects, to_world, vote  # noqa: E402
+from gradcam_live import LiveGradCam  # noqa: E402  (optional: needs TensorFlow)
 
 # Ground truth, used ONLY to score the robot's answers at the end.
 TRUTH = {"RED_BLOCK": "red block", "GREEN_BLOCK": "green block", "BLUE_BLOCK": "blue block",
@@ -108,6 +112,9 @@ class ObjectFinder:
         self.cnn = AsyncClassifier(HERE.parent / "colour_detector" / "models")
         print(f"[init] camera {self.width}x{self.height}, CNN {'ON' if self.cnn.enabled else 'OFF'} - "
               f"{self.cnn.description}")
+        self.gradcam = LiveGradCam()
+        print(f"[init] Grad-CAM {'ON (Keras model, background thread)' if self.gradcam.available else 'OFF - ' + self.gradcam.reason}")
+        self.display = self.sup.getDevice("display")  # optional screen for the heatmap
         self.images = HERE / "images"
         self.capture_count = 0
         self.found = []
@@ -119,6 +126,29 @@ class ObjectFinder:
     def step(self) -> None:
         if self.sup.step(self.step_ms) == -1:
             raise SystemExit(0)
+        for tag, img, label, prob, error in self.gradcam.poll():
+            if error:
+                print(f"[gradcam] {tag}: failed - {error}")
+            else:
+                self.show_heatmap(tag, img, label, prob)
+
+    def show_heatmap(self, tag: str, img, label: str, prob: float) -> None:
+        """Save the Grad-CAM overlay and paste it on the robot's display."""
+        print(f"[gradcam] {tag}: {label} {prob:.0%}, heatmap shown on the display")
+        self.images.mkdir(exist_ok=True)
+        cv.imwrite(str(self.images / f"gradcam_{tag}.png"), img)
+        if self.display is None:
+            return
+        w, h = self.display.getWidth(), self.display.getHeight()
+        bgra = cv.cvtColor(cv.resize(img, (w, h)), cv.COLOR_BGR2BGRA)
+        ref = self.display.imageNew(bgra.tobytes(), self.display.BGRA, w, h)
+        self.display.imagePaste(ref, 0, 0, False)
+        self.display.imageDelete(ref)
+        self.display.setColor(0x000000)
+        self.display.fillRectangle(0, 0, w, 26)
+        self.display.setColor(0xFFFFFF)
+        self.display.setFont("Arial", 16, True)
+        self.display.drawText(f"Grad-CAM: {label} {prob:.0%}", 6, 5)
 
     def wheels(self, left: float, right: float) -> None:
         self.left.setVelocity(max(-MAX_SPEED, min(MAX_SPEED, left)))
@@ -136,8 +166,9 @@ class ObjectFinder:
         lines = [f"Objects found by lidar: {len(self.found)}"]
         for i, a in enumerate(self.answers, start=1):
             lines.append(f"{i}. {a['said']}")
-        self.sup.setLabel(0, "CNN OBJECT TOUR", 0.01, 0.01, 0.14, YELLOW, 0.0, "Arial Black")
-        self.sup.setLabel(1, "\n".join(lines), 0.01, 0.08, 0.12, BLACK, 0.0, "Arial Black")
+        # Right-hand side: the Grad-CAM display sits in the top-left corner of the 3D view.
+        self.sup.setLabel(0, "CNN OBJECT TOUR", 0.66, 0.01, 0.14, YELLOW, 0.0, "Arial Black")
+        self.sup.setLabel(1, "\n".join(lines), 0.66, 0.08, 0.12, BLACK, 0.0, "Arial Black")
         self.sup.setLabel(2, self.hud_status, 0.01, 0.9, 0.13, BLACK, 0.0, "Arial Black")
 
     # ----- motion ------------------------------------------------------------
@@ -243,7 +274,7 @@ class ObjectFinder:
         # (the truck) would otherwise put the camera beside another object.
         d_max = math.hypot(obj.x - cx, obj.y - cy) + OVERSHOOT_M
         answer = {"x": obj.x, "y": obj.y, "said": "not reached", "status": "NOT REACHED", "views": []}
-        cnn_answers, problems, block_checked = [], [], False
+        cnn_answers, problems, block_checked, frames = [], [], False, []
         for i, scale in enumerate(VIEW_SCALES, start=1):
             d = min(obj.view_distance(), d_max / max(VIEW_SCALES)) * scale
             vx, vy = obj.x + d * math.cos(back), obj.y + d * math.sin(back)
@@ -271,9 +302,13 @@ class ObjectFinder:
                   f"   [{result.latency_ms:.1f} ms, off the control loop]")
             self.hud(f"Object {k}, view {i}: CNN says {result.label} {result.confidence:.0%}")
             cnn_answers.append((result.label, result.confidence))
+            frames.append((result.label, result.confidence, bgr))
             answer["views"].append(f"{result.label} {result.confidence:.0%}")
         if cnn_answers:
             label, mean, sure = vote(cnn_answers)
+            # Grad-CAM on the view the CNN was most sure about for the winning class.
+            best = max((f for f in frames if f[0] == label), key=lambda f: f[1])
+            self.gradcam.submit(f"object{k}", vision.square_crop(best[2]))
             answer.update(label=label, status="SURE" if sure else "UNSURE",
                           said=f"{label} ({mean:.0%})" if sure else f"unsure ({label}? {mean:.0%})")
         elif block_checked:  # reached, but the CNN gave no answer
@@ -350,6 +385,8 @@ class ObjectFinder:
                 print(f"[result] object {k}: {a['said']}")
                 self.hud(f"Object {k}: {a['said']}")
             self.drive_to(*self.home)
+            for _ in range(int(3000 / self.step_ms)):  # let the last heatmap arrive
+                self.step()
         except SystemExit:  # Webots is closing the simulation: nothing more to do
             raise
         except Exception:

@@ -168,6 +168,12 @@ DEF EPUCK E-puck {
     GPS {
       name "gps"
     }
+    # Screen for the live Grad-CAM heatmap; Webots draws it on the 3D view.
+    Display {
+      name "display"
+      width 256
+      height 256
+    }
     InertialUnit {
       name "inertial unit"
     }
