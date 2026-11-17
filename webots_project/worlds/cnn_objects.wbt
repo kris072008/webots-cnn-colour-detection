@@ -17,14 +17,17 @@ WorldInfo {
     "checked with HSV colour detection; objects are named by the CIFAR-10 CNN."
     "Objects are real size, so each sits at its own distance from the centre:"
     "the robot stops where the object fills its camera view. Blocks sit 3.5 m out."
+    "The view follows the robot; the yellow ball on top is only a display marker."
     "Controller: object_finder."
   ]
   title "CNN object tour"
   basicTimeStep 32
 }
 Viewpoint {
-  orientation -0.5774 0.5774 0.5774 2.0944
-  position 0 0 34
+  orientation -0.3299 0.3299 0.8845 1.6933
+  position 0.0 -15.0 13.0
+  follow "e-puck"
+  followType "Tracking Shot"
 }
 TexturedBackground {
 }
@@ -128,4 +131,42 @@ DEF EPUCK E-puck {
   supervisor TRUE
   camera_width 160
   camera_height 120
+  turretSlot [
+    # Display marker only (no physics): a tall yellow pole and ball so the
+    # small e-puck is easy to follow on a projector. It sits behind and
+    # above the camera, so it never appears in the robot's own images.
+    Pose {
+      translation 0 0 0.2
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 1 0.8 0
+            emissiveColor 0.6 0.45 0
+            roughness 1
+            metalness 0
+          }
+          geometry Cylinder {
+            height 0.4
+            radius 0.025
+          }
+        }
+        Pose {
+          translation 0 0 0.4
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 1 0.8 0
+                emissiveColor 0.6 0.45 0
+                roughness 1
+                metalness 0
+              }
+              geometry Sphere {
+                radius 0.25
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
