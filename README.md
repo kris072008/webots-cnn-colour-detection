@@ -28,7 +28,7 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 **Every Webots animal, through the robot's camera** ([`cnn/webots_animals.ipynb`](cnn/webots_animals.ipynb)): the robot photographed all eight animals in the Webots library from 24 directions. Deer and horse were right in 43 of 48 views, cat and dog in none (both mostly "horse"). Replacing only the background with grey made the dog right in 12 of 24 views and dropped the deer from 21 to 4, so the CNN reads the scenery as much as the animal.
 
-**A CNN object tour** ([`cnn/webots_object_tour.ipynb`](cnn/webots_object_tour.ipynb), world `cnn_objects.wbt`): the robot visits three blocks and five Webots objects and ticks them off a checklist. Truck, horse, car and deer were named correctly; a paper boat on a wooden floor was called "airplane".
+**A CNN object tour** ([`cnn/webots_object_tour.ipynb`](cnn/webots_object_tour.ipynb), world `cnn_objects.wbt`): the robot finds three blocks and five Webots objects by itself with a 360° lidar, names them (HSV for blocks, the int8 CNN with a three-view vote and an "unsure" answer for the rest) and ticks them off a checklist drawn on the 3D view. All 8 found, 7 named correctly; a paper boat was called "airplane" even standing on water. Grad-CAM on these photos and on a bird photo of my own: [`cnn/gradcam_tour_bird.ipynb`](cnn/gradcam_tour_bird.ipynb).
 
 **Does the CNN slow the robot down?** With 50 ms added to every inference to emulate a slow embedded CPU, running the CNN inside the control loop on every frame missed the 32 ms deadline in 50% of steps (worst step 135 ms). The deployed design, with a background thread and event-triggered inference, missed none ([`timing/`](cnn/results/webots_runs/timing/)).
 
@@ -39,7 +39,7 @@ Figures, model files and the model card are in [`cnn/results/`](cnn/results/). W
 ```bash
 cd webots_project
 python3 -m pip install opencv-python numpy pytest
-python3 -m pytest tests -q          # 62 unit tests
+python3 -m pytest tests -q          # 75 unit tests
 ```
 
 Open `webots_project/worlds/colour_blocks.wbt` in Webots and press ▶.

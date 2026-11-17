@@ -35,7 +35,7 @@ webots_project/
 │   └── animal_photographer/
 │       ├── animal_photographer.py  # supervisor: photographs each animal from 24 directions
 │       └── silhouette.py           # background subtraction: the animal's mask and box
-└── tests/                       # 62 unit tests, no Webots needed
+└── tests/                       # 75 unit tests, no Webots needed
     ├── test_vision.py           # detector + classifier
     ├── test_benchmark.py        # timing experiment
     ├── test_projection.py       # dataset labelling maths + shape model hook
@@ -173,7 +173,7 @@ These were measured in Webots R2025a, headless, on Apple M4:
 * **CNN model:** 86.47% test accuracy on the 10,000 CIFAR-10 test images (Keras float32); the deployed full-int8 TFLite model scores 86.57% at 328 kB (3.7× smaller than float32). Full numbers: `../cnn/results/`.
 * **CNN on Webots camera images:** in `cnn_camera_test.wbt` the dog was classified as **horse (95%)**, with dog third (1%). The blocks are classified mostly as airplane or ship, because a coloured box is not a CIFAR-10 class. Both are out-of-distribution results, discussed in the report. Logs and images: `../cnn/results/webots_runs/`.
 * **Every Webots animal** (`animal_safari.wbt`, 8 animals × 24 directions, 192 images labelled by background subtraction): deer and horse were named correctly in 43 of 48 views, cat and dog in none (both mostly "horse"). With the background replaced by grey, the dog was right in 12 of 24 views and the deer dropped from 21 to 4: the CNN leans on the scenery. Re-run with Webots (`--batch` on `worlds/animal_safari.wbt` writes `../cnn/webots_animals/`), then `../cnn/webots_animals.ipynb`. Results: `../cnn/results/webots_animals/`.
-* **CNN object tour** (`cnn_objects.wbt`, controller `object_finder`, separate demo): the e-puck drives to three blocks and five real-size Webots objects (truck, horse, car, deer, paper boat), checks blocks with HSV and names objects with the int8 CNN over three photos each. Result: 4 of 5 objects and 3 of 3 blocks; the paper boat is called "airplane". The robot reads object positions as a map; recognition is from the camera only. Photos and CNN answers: `../cnn/webots_object_tour.ipynb`.
+* **CNN object tour** (`cnn_objects.wbt`, controller `object_finder`, separate demo): the e-puck carries a 360° lidar, GPS and an inertial unit. It finds the objects itself (`lidar_objects.py`), drives to each, calls a big coloured blob a block (HSV) and otherwise takes three photos for the int8 CNN, which vote; under 60% or without two agreeing views it says "unsure". The checklist is drawn on the 3D view. Result: all 8 objects found, 7 named correctly; the paper boat is "airplane" even on water. Ground truth is read only to score the answers. Photos and CNN answers: `../cnn/webots_object_tour.ipynb`.
 
 ## Tests
 

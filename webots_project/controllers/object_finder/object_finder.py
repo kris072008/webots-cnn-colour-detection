@@ -1,32 +1,39 @@
-"""CNN object tour: the e-puck drives to each object in worlds/cnn_objects.wbt
-and ticks it off a checklist when its camera recognises it.
+"""CNN object tour: the e-puck finds the objects in worlds/cnn_objects.wbt by
+itself, drives to each one, names it, and ticks it off a checklist.
 
-Separate demo world, not part of the main results. Three coloured blocks are
-checked with the same HSV detector as the colour-block search (vision.py);
-five CIFAR-10 objects (car, truck, horse, deer, boat), scaled down to toy
-size, are named by the same int8 CIFAR-10 CNN, on the same background thread
-(classifier.py).
+Separate demo world, not part of the main results.
 
-What is and is not autonomous: the robot is a supervisor and reads where each
-object is, like a map, so the route is planned from known positions. The
-driving is real (wheel speeds from a proportional heading controller), and the
-recognition is real: the verdict comes only from the camera image. At each
-object the robot takes three views on one line (normal distance, 15% closer,
-15% further) and adds up the CNN's top-3 confidences, so one bad view does not
-decide.
+How it works
+------------
+1. Find: from the arena centre the robot takes one 360-degree lidar scan. Hits
+   on the floor are dropped and the rest are grouped into objects
+   (lidar_objects.py). The robot knows its own position and heading from its
+   GPS and inertial unit; it is never told where the objects are.
+2. Look: for each object it drives along the line from the centre towards the
+   object, to a distance that depends on the object's width, so the object fills
+   the camera's square crop.
+3. Name: if the view is dominated by one coloured blob (HSV, vision.py), it is a
+   coloured block. Otherwise it takes three photos (normal distance, 15% closer,
+   15% further), the int8 CIFAR-10 CNN names each on its background thread
+   (classifier.py), and the answers vote. If fewer than two views agree, or the
+   winner's mean confidence is below 60%, the robot answers "unsure".
+4. Show: the checklist and the current answer are drawn on the 3D view.
 
-controllerArgs (optional): --views=N (default 3), --quit (quit when done; for
-batch testing).
+The robot is a supervisor only so that, at the end, its answers can be scored
+against what each object really is. Navigation and recognition use only the
+robot's own sensors.
+
+controllerArgs (optional): --quit (quit when done; for batch testing).
 """
 
 from __future__ import annotations
 
 import math
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import cv2 as cv
+import numpy as np
 from controller import Supervisor
 
 HERE = Path(__file__).resolve().parent
@@ -34,56 +41,38 @@ sys.path.insert(0, str(HERE.parent / "colour_detector"))
 import vision  # noqa: E402  (same HSV detection and cropping as the block search)
 from classifier import AsyncClassifier  # noqa: E402  (same CNN, same background thread)
 
-# Route order goes round the ring. kind "block": expected HSV colour;
-# kind "object": expected CIFAR-10 class. The objects are real size, so each
-# has its own viewing distance (m from its centre) at which it fills the
-# camera's square crop. The world places each object so that this viewpoint is
-# about 1.2 m from the arena centre (blocks: 2.5 m, so they stay out of other
-# shots). The truck's 15% further view lies past the centre.
-TARGETS = [
-    ("RED_BLOCK", "block", "red", 1.0),
-    ("TRUCK", "object", "truck", 9.0),
-    ("GREEN_BLOCK", "block", "green", 1.0),
-    ("HORSE", "object", "horse", 5.5),
-    ("BLUE_BLOCK", "block", "blue", 1.0),
-    ("CAR", "object", "automobile", 7.8),
-    ("BOAT", "object", "ship", 0.55),
-    ("DEER", "object", "deer", 4.0),
-]
+from lidar_objects import find_objects, to_world, vote  # noqa: E402
+
+# Ground truth, used ONLY to score the robot's answers at the end.
+TRUTH = {"RED_BLOCK": "red block", "GREEN_BLOCK": "green block", "BLUE_BLOCK": "blue block",
+         "TRUCK": "truck", "HORSE": "horse", "CAR": "automobile", "BOAT": "ship", "DEER": "deer"}
+# The truck's origin is its rear axle; its body centre is about 3 m forward.
+BODY_FORWARD_M = {"TRUCK": 3.0}
+MATCH_M = 4.0  # an object found within this distance of a real object's body can be that object
+OVERSHOOT_M = 3.0  # a viewpoint may lie at most this far past the start point
+
+BLOCK_FILL = 0.25  # a blob covering this much of the frame means a coloured block (blocks fill ~32%)
 VIEW_SCALES = (1.0, 0.85, 1.15)  # three views on one line: normal, closer, further
-# The truck's origin is at its rear axle, so aim 4.5 m forward (its local x) at the cab.
-AIM_FORWARD_M = {"TRUCK": 4.5}
-# Keep-out radius round each object. A side view whose straight path from the
-# centre would pass this close to another object is skipped, not driven into.
-CLEARANCE_M = {"RED_BLOCK": 0.6, "GREEN_BLOCK": 0.6, "BLUE_BLOCK": 0.6, "BOAT": 0.4,
-               "HORSE": 1.6, "DEER": 1.2, "CAR": 2.7, "TRUCK": 4.0}
 MAX_SPEED = 6.28  # rad/s, e-puck wheels
-DRIVE_SPEED = MAX_SPEED  # full speed: the routes are long and clear
+DRIVE_SPEED = MAX_SPEED
 TURN_SPEED = 0.35 * MAX_SPEED
-STEER_GAIN = 1.2 * MAX_SPEED  # wheel speed difference per radian of heading error
+STEER_GAIN = 1.2 * MAX_SPEED
 REACHED_M = 0.03
 FACING_RAD = 0.03
 LEG_TIMEOUT_S = 120.0
 CNN_TIMEOUT_S = 3.0
+BLACK, YELLOW = 0x101010, 0xE0A000
 
 
-def parse_args(argv: list[str]) -> dict[str, str]:
-    values = {"views": "3", "quit": ""}
+def parse_args(argv: list[str]) -> dict[str, bool]:
+    quit_when_done = False
     for arg in argv:
         if not arg.strip():
             continue
-        if arg == "--quit":
-            values["quit"] = "1"
-            continue
-        if arg.startswith("--quit="):
-            raise ValueError("use --quit on its own (no value)")
-        if not arg.startswith("--") or "=" not in arg:
-            raise ValueError(f"bad argument {arg!r}, expected --key=value or --quit")
-        key, value = arg[2:].split("=", 1)
-        if key not in values:
-            raise ValueError(f"unknown argument --{key}")
-        values[key] = value
-    return values
+        if arg != "--quit":
+            raise ValueError(f"unknown argument {arg!r} (only --quit is accepted)")
+        quit_when_done = True
+    return {"quit": quit_when_done}
 
 
 def wrap(angle: float) -> float:
@@ -91,35 +80,40 @@ def wrap(angle: float) -> float:
 
 
 class ObjectFinder:
-    def __init__(self, args: dict[str, str]) -> None:
+    def __init__(self, args: dict[str, bool]) -> None:
         self.sup = Supervisor()
         self.step_ms = int(self.sup.getBasicTimeStep())
-        self.camera = self.sup.getDevice("camera")
+
+        def device(name):
+            dev = self.sup.getDevice(name)
+            if dev is None:
+                raise RuntimeError(f"the e-puck has no device {name!r} (check worlds/cnn_objects.wbt)")
+            return dev
+
+        self.camera = device("camera")
         self.camera.enable(self.step_ms)
         self.width, self.height = self.camera.getWidth(), self.camera.getHeight()
-        self.left = self.sup.getDevice("left wheel motor")
-        self.right = self.sup.getDevice("right wheel motor")
+        self.lidar = device("lidar")
+        self.lidar.enable(self.step_ms)
+        self.lidar.enablePointCloud()
+        self.gps = device("gps")
+        self.gps.enable(self.step_ms)
+        self.imu = device("inertial unit")
+        self.imu.enable(self.step_ms)
+        self.left, self.right = device("left wheel motor"), device("right wheel motor")
         for motor in (self.left, self.right):
             motor.setPosition(float("inf"))
             motor.setVelocity(0.0)
-        self.me = self.sup.getSelf()
-        if not args["views"].isdigit() or not 1 <= int(args["views"]) <= len(VIEW_SCALES):
-            raise ValueError(f"--views must be 1 to {len(VIEW_SCALES)}, not {args['views']!r}")
-        self.views = int(args["views"])
-        self.quit_when_done = bool(args["quit"])
-        self.nodes = {}
-        for name, *_ in TARGETS:
-            node = self.sup.getFromDef(name)
-            if node is None:
-                raise RuntimeError(f"world has no node DEF {name}")
-            self.nodes[name] = node
+        self.quit_when_done = args["quit"]
         self.cnn = AsyncClassifier(HERE.parent / "colour_detector" / "models")
         print(f"[init] camera {self.width}x{self.height}, CNN {'ON' if self.cnn.enabled else 'OFF'} - "
               f"{self.cnn.description}")
         self.images = HERE / "images"
-        self.images.mkdir(exist_ok=True)
-        self.results: dict[str, tuple[str, str]] = {}  # name -> (status, what was seen)
         self.capture_count = 0
+        self.found = []
+        self.answers: list[dict] = []  # one per object found
+        self.hud_status = "starting"
+        self.home = (0.0, 0.0)
 
     # ----- low-level ---------------------------------------------------------
     def step(self) -> None:
@@ -131,34 +125,23 @@ class ObjectFinder:
         self.right.setVelocity(max(-MAX_SPEED, min(MAX_SPEED, right)))
 
     def pose(self) -> tuple[float, float, float]:
-        x, y, _ = self.me.getPosition()
-        m = self.me.getOrientation()  # 3x3 rotation matrix, row-major
-        return x, y, math.atan2(m[3], m[0])
+        """Position from GPS, heading (yaw) from the inertial unit."""
+        x, y, _ = self.gps.getValues()
+        return x, y, self.imu.getRollPitchYaw()[2]
 
-    def target_xy(self, name: str) -> tuple[float, float]:
-        """Where to aim: the object's origin, moved forward for the truck."""
-        x, y, _ = self.nodes[name].getPosition()
-        forward = AIM_FORWARD_M.get(name, 0.0)
-        if forward:
-            m = self.nodes[name].getOrientation()
-            x, y = x + forward * m[0], y + forward * m[3]
-        return x, y
-
-    def path_is_clear(self, name: str, vx: float, vy: float) -> bool:
-        """Does the straight path from the centre to (vx, vy) keep clear of the other objects?"""
-        length = math.hypot(vx, vy)
-        for other, *_ in TARGETS:
-            if other == name:
-                continue
-            ox, oy = self.target_xy(other)  # the truck's body centre, not its rear axle
-            t = 0.0 if length == 0 else max(0.0, min(1.0, (ox * vx + oy * vy) / length ** 2))
-            if math.hypot(ox - t * vx, oy - t * vy) < CLEARANCE_M[other]:
-                return False
-        return True
+    # ----- on-screen display -------------------------------------------------
+    def hud(self, status: str | None = None) -> None:
+        if status is not None:
+            self.hud_status = status
+        lines = [f"Objects found by lidar: {len(self.found)}"]
+        for i, a in enumerate(self.answers, start=1):
+            lines.append(f"{i}. {a['said']}")
+        self.sup.setLabel(0, "CNN OBJECT TOUR", 0.01, 0.01, 0.14, YELLOW, 0.0, "Arial Black")
+        self.sup.setLabel(1, "\n".join(lines), 0.01, 0.08, 0.12, BLACK, 0.0, "Arial Black")
+        self.sup.setLabel(2, self.hud_status, 0.01, 0.9, 0.13, BLACK, 0.0, "Arial Black")
 
     # ----- motion ------------------------------------------------------------
     def turn_to(self, heading: float) -> bool:
-        """Turn on the spot to ``heading``. False if it timed out."""
         deadline = self.sup.getTime() + LEG_TIMEOUT_S
         ok = False
         while self.sup.getTime() < deadline:
@@ -176,8 +159,6 @@ class ObjectFinder:
         return ok
 
     def drive_to(self, gx: float, gy: float) -> bool:
-        """Turn towards the goal, then drive with proportional heading control.
-        False if the goal was not reached within LEG_TIMEOUT_S of simulated time."""
         deadline = self.sup.getTime() + LEG_TIMEOUT_S
         ok = False
         while self.sup.getTime() < deadline:
@@ -187,7 +168,7 @@ class ObjectFinder:
                 ok = True
                 break
             err = wrap(math.atan2(gy - y, gx - x) - heading)
-            if abs(err) > 0.6:  # far off course (or just starting): turn on the spot first
+            if abs(err) > 0.6:
                 self.turn_to(math.atan2(gy - y, gx - x))
                 continue
             base = DRIVE_SPEED * min(1.0, dist / 0.15 + 0.2)
@@ -199,44 +180,52 @@ class ObjectFinder:
             print(f"[drive] gave up reaching ({gx:.2f}, {gy:.2f}) after {LEG_TIMEOUT_S:.0f} s")
         return ok
 
-    def go_and_face(self, vx: float, vy: float, face: float) -> bool:
-        return self.drive_to(vx, vy) and self.turn_to(face)
+    # ----- sensing -----------------------------------------------------------
+    def scan(self) -> None:
+        """One 360-degree lidar scan from where the robot stands."""
+        for _ in range(3):
+            self.step()
+        cloud = self.lidar.getPointCloud()
+        raw = np.array([[p.x, p.y, p.z] for p in cloud], dtype=float).reshape(-1, 3)
+        raw = raw[np.isfinite(raw).all(axis=1)]  # no-return beams come back as infinity
+        if len(raw) == 0:
+            raise RuntimeError("the lidar returned no points - is it enabled and in the turret slot?")
+        x, y, yaw = self.pose()
+        self.home = (x, y)  # every leg starts here, so paths never cross another object
+        self.found = find_objects(to_world(raw, x, y, self.lidar_height, yaw), self.lidar.getMaxRange(), (x, y))
+        print(f"[lidar] {len(raw)} points, {len(self.found)} objects found")
+        for i, f in enumerate(self.found, start=1):
+            print(f"[lidar]   object {i}: at ({f.x:+.1f}, {f.y:+.1f}) m, {f.width:.1f} m wide, "
+                  f"{f.points} points -> view from {f.view_distance():.1f} m")
 
-    # ----- vision ------------------------------------------------------------
+    @property
+    def lidar_height(self) -> float:
+        """Height of the lidar above the floor, from where it is mounted on the robot."""
+        if not hasattr(self, "_lidar_h"):
+            slot = self.sup.getSelf().getField("turretSlot")
+            nodes = [slot.getMFNode(i) for i in range(slot.getCount())]
+            lidars = [n for n in nodes if n.getTypeName() == "Lidar"]
+            if not lidars:
+                raise RuntimeError("no Lidar node in the e-puck's turretSlot")
+            self._lidar_h = lidars[0].getPosition()[2]
+        return self._lidar_h
+
     def frame(self):
-        for _ in range(3):  # let the robot settle and the camera render
+        for _ in range(3):
             self.step()
         bgr = vision.webots_to_bgr(self.camera.getImage(), self.width, self.height)
         if bgr is None:
             raise RuntimeError("camera returned no image")
         return bgr
 
-    def save(self, name: str, view: int, bgr) -> None:
+    def save(self, k: int, view: int, bgr) -> None:
         self.capture_count += 1
-        path = self.images / f"{self.capture_count:03d}_{name.lower()}_view{view}.png"
-        self.images.mkdir(exist_ok=True)  # in case it was deleted while the tour runs
+        self.images.mkdir(exist_ok=True)
+        path = self.images / f"{self.capture_count:03d}_object{k}_view{view}.png"
         if not cv.imwrite(str(path), bgr):
             raise RuntimeError(f"could not write {path}")
 
-    def check_block(self, name: str, expected: str, view: tuple[float, float, float]) -> None:
-        if not self.go_and_face(*view):
-            self.results[name] = ("NOT REACHED", "robot did not reach its viewpoint")
-            return
-        bgr = self.frame()
-        self.save(name, 1, bgr)
-        seen = vision.detect_blocks(bgr)
-        if not seen:
-            self.results[name] = ("MISSED", "HSV sees no coloured blob")
-            print(f"[hsv] {name.lower()}: no coloured blob in view")
-            return
-        top = seen[0]
-        self.results[name] = ("FOUND" if top.colour == expected else "MISSED", f"HSV sees {top.colour}")
-        print(f"[hsv] {name.lower()}: biggest blob is {top.colour} ({top.area_fraction:.0%} of the image)")
-
-    def classify(self, name: str, view: int, bgr) -> tuple[object | None, str]:
-        """Submit to the background CNN and step until the answer comes back.
-        Returns (prediction, "") or (None, why there is none)."""
-        tag = f"{name.lower()}_view{view}"
+    def classify(self, tag: str, bgr):
         if not self.cnn.submit(tag, vision.square_crop(bgr)):
             return None, "CNN off"
         for _ in range(int(CNN_TIMEOUT_S * 1000 / self.step_ms)):
@@ -246,104 +235,136 @@ class ObjectFinder:
             self.step()
         return None, f"no CNN answer within {CNN_TIMEOUT_S:.0f} s"
 
-    def check_object(self, name: str, expected: str, views: list[tuple[float, float, float]]) -> None:
-        # Vote: each view adds its top-1 confidence to its top-1 class.
-        votes: dict[str, float] = defaultdict(float)
-        answered, problems = 0, []
-        for i, view in enumerate(views, start=1):
-            if not self.path_is_clear(name, view[0], view[1]):
-                problems.append(f"view {i} blocked")
-                print(f"[tour] {name.lower()} view {i}: skipped, another object is in the way")
-                continue
-            if not self.go_and_face(*view):  # views share one line through the centre
+    # ----- one object ---------------------------------------------------------
+    def look_at(self, k: int, obj) -> dict:
+        cx, cy = self.home
+        back = math.atan2(cy - obj.y, cx - obj.x)
+        # Never stand more than OVERSHOOT_M past the start point: a large object
+        # (the truck) would otherwise put the camera beside another object.
+        d_max = math.hypot(obj.x - cx, obj.y - cy) + OVERSHOOT_M
+        answer = {"x": obj.x, "y": obj.y, "said": "not reached", "status": "NOT REACHED", "views": []}
+        cnn_answers, problems, block_checked = [], [], False
+        for i, scale in enumerate(VIEW_SCALES, start=1):
+            d = min(obj.view_distance(), d_max / max(VIEW_SCALES)) * scale
+            vx, vy = obj.x + d * math.cos(back), obj.y + d * math.sin(back)
+            self.hud(f"Object {k}: driving to view {i}")
+            if not (self.drive_to(vx, vy) and self.turn_to(math.atan2(obj.y - vy, obj.x - vx))):
                 problems.append(f"view {i} not reached")
                 continue
             bgr = self.frame()
-            self.save(name, i, bgr)
-            result, why = self.classify(name, i, bgr)
+            self.save(k, i, bgr)
+            if not block_checked:  # first captured view decides: coloured block, or one for the CNN?
+                block_checked = True
+                blobs = vision.detect_blocks(bgr)
+                if blobs and blobs[0].area_fraction >= BLOCK_FILL:
+                    colour = blobs[0].colour
+                    print(f"[hsv] object {k}: {colour} blob fills {blobs[0].area_fraction:.0%} -> {colour} block")
+                    answer.update(said=f"{colour} block", status="BLOCK", label=f"{colour} block")
+                    return answer
+            result, why = self.classify(f"object{k}_view{i}", bgr)
             if result is None:
+                print(f"[cnn] object {k} view {i}: {why}")
                 problems.append(f"view {i}: {why}")
-                print(f"[cnn] {name.lower()} view {i}: {why}")
                 continue
-            answered += 1
             top3 = ", ".join(f"{label} {p:.0%}" for label, p in result.top3)
-            print(f"[cnn] {name.lower()} view {i}/{len(views)}: {result.label} ({result.confidence:.0%})"
-                  f"   top-3: {top3}   [{result.latency_ms:.1f} ms, off the control loop]")
-            votes[result.label] += result.confidence
-        if not answered:
-            status = "SKIPPED" if any("CNN off" in p for p in problems) else "NOT REACHED"
-            self.results[name] = (status, "; ".join(problems) or "no view")
+            print(f"[cnn] object {k} view {i}/3: {result.label} ({result.confidence:.0%})   top-3: {top3}"
+                  f"   [{result.latency_ms:.1f} ms, off the control loop]")
+            self.hud(f"Object {k}, view {i}: CNN says {result.label} {result.confidence:.0%}")
+            cnn_answers.append((result.label, result.confidence))
+            answer["views"].append(f"{result.label} {result.confidence:.0%}")
+        if cnn_answers:
+            label, mean, sure = vote(cnn_answers)
+            answer.update(label=label, status="SURE" if sure else "UNSURE",
+                          said=f"{label} ({mean:.0%})" if sure else f"unsure ({label}? {mean:.0%})")
+        elif block_checked:  # reached, but the CNN gave no answer
+            answer.update(status="NO ANSWER", said="no CNN answer")
+        if problems:
+            print(f"[tour] object {k}: " + "; ".join(problems))
+        return answer
+
+    # ----- scoring (ground truth used only here) ------------------------------
+    def truth_xy(self, name: str) -> tuple[float, float]:
+        node = self.sup.getFromDef(name)
+        x, y, _ = node.getPosition()
+        fwd = BODY_FORWARD_M.get(name, 0.0)
+        if fwd:
+            m = node.getOrientation()
+            x, y = x + fwd * m[0], y + fwd * m[3]
+        return x, y
+
+    def score(self) -> None:
+        """Compare the robot's answers with what each object really is (one-to-one)."""
+        truths = {}
+        for n in TRUTH:
+            if self.sup.getFromDef(n) is None:
+                print(f"[score] WARNING: no node DEF {n} in the world, it cannot be scored")
+            else:
+                truths[n] = self.truth_xy(n)
+        print("=" * 72)
+        if not truths:
+            print("[score] NO GROUND TRUTH in the world - cannot score the answers")
             return
-        best = max(votes, key=votes.get)
-        self.results[name] = ("FOUND" if best == expected else "MISSED",
-                              f"CNN says {best} (won {answered}-view vote)")
+        # Greedy one-to-one matching: closest pairs first, each real object used once.
+        pairs = sorted((math.hypot(tx - a["x"], ty - a["y"]), k, n)
+                       for k, a in enumerate(self.answers) for n, (tx, ty) in truths.items())
+        match, used = {}, set()
+        for dist, k, n in pairs:
+            if dist < MATCH_M and k not in match and n not in used:
+                match[k] = n
+                used.add(n)
+        right = 0
+        for k, a in enumerate(self.answers):
+            real = TRUTH[match[k]] if k in match else "nothing (false detection)"
+            if a["status"] in ("NOT REACHED", "NO ANSWER"):
+                verdict = a["status"]
+            elif a.get("label") == real and a["status"] in ("SURE", "BLOCK"):
+                verdict = "RIGHT"
+                right += 1
+            elif a["status"] == "UNSURE":
+                verdict = "UNSURE (right guess)" if a.get("label") == real else "UNSURE (wrong guess)"
+            else:
+                verdict = "WRONG"
+            print(f"  object {k + 1}: robot said {a['said']:28s} really {real:26s} {verdict}")
+        missed = [TRUTH[n] for n in truths if n not in used]
+        print(f"TOUR SUMMARY: lidar found {len(self.found)} objects; {right} of {len(truths)} real objects named "
+              "correctly" + (f"; never found: {', '.join(missed)}" if missed else "; none missed")
+              + ("" if self.cnn.enabled else "; CNN WAS OFF"))
+        print(f"  images saved in {self.images}")
+        print("=" * 72)
+        self.hud(f"Done: {right} of {len(truths)} named correctly")
 
     # ----- tour --------------------------------------------------------------
-    def views_for(self, name: str, distance: float) -> list[tuple[float, float, float]]:
-        """Viewpoints on the line from the object through the arena centre, at
-        slightly different distances, so the CNN sees it at three sizes. For far
-        objects (the truck) the further view can lie past the centre."""
-        tx, ty = self.target_xy(name)
-        back = math.atan2(-ty, -tx)  # from the object towards the centre
-        points = []
-        for scale in VIEW_SCALES[: self.views]:
-            d = distance * scale
-            vx, vy = tx + d * math.cos(back), ty + d * math.sin(back)
-            points.append((vx, vy, math.atan2(ty - vy, tx - vx)))
-        return points
-
-    def checklist(self) -> str:
-        parts = []
-        for name, *_ in TARGETS:
-            label = name.lower().replace("_block", "")
-            status = self.results[name][0] if name in self.results else "not yet"
-            parts.append(f"{label} {status}")
-        return " · ".join(parts)
-
     def run(self) -> None:
         if not self.cnn.enabled:
-            print(f"[init] WARNING: CNN OFF - objects will be SKIPPED, only the blocks are checked. "
-                  f"Reason: {self.cnn.description}")
-        print("[tour] visiting 3 blocks (HSV colour check) and 5 objects (CIFAR-10 CNN)")
+            print(f"[init] WARNING: CNN OFF - only blocks can be named. Reason: {self.cnn.description}")
         try:
-            for name, kind, expected, distance in TARGETS:
-                print(f"[tour] -> {name.lower()} (expect {expected})")
-                if not self.drive_to(0.0, 0.0):  # every leg starts at the centre
-                    self.results[name] = ("NOT REACHED", "could not get back to the centre")
-                else:
-                    views = self.views_for(name, distance)
-                    if kind == "block":
-                        self.check_block(name, expected, views[0])
-                    else:
-                        self.check_object(name, expected, views)
-                status, seen = self.results[name]
-                print(f"[result] {name.lower()}: {seen} -> {status} (expected {expected})")
-                print(f"[checklist] {self.checklist()}")
-            self.drive_to(0.0, 0.0)
-        finally:
-            self.wheels(0, 0)  # never leave the robot driving after an error
-            self.summary()
+            self.hud("Scanning with lidar...")
+            self.scan()
+            for k, obj in enumerate(self.found, start=1):
+                print(f"[tour] -> object {k} of {len(self.found)}")
+                if not self.drive_to(*self.home):
+                    self.answers.append({"x": obj.x, "y": obj.y, "said": "not reached", "status": "NOT REACHED"})
+                    continue
+                a = self.look_at(k, obj)
+                self.answers.append(a)
+                print(f"[result] object {k}: {a['said']}")
+                self.hud(f"Object {k}: {a['said']}")
+            self.drive_to(*self.home)
+        except SystemExit:  # Webots is closing the simulation: nothing more to do
+            raise
+        except Exception:
+            self.wheels(0, 0)
+            self.score()
+            if self.quit_when_done:
+                self.sup.simulationQuit(1)
+            raise
+        self.wheels(0, 0)
+        self.score()
         if self.quit_when_done:
-            all_found = all(self.results.get(n, ("",))[0] == "FOUND" for n, *_ in TARGETS)
-            self.sup.simulationQuit(0 if all_found else 1)
+            self.sup.simulationQuit(0)
             self.step()
         while True:
             self.step()
-
-    def summary(self) -> None:
-        def count(kind: str) -> str:
-            names = [n for n, k, *_ in TARGETS if k == kind]
-            found = sum(self.results.get(n, ("",))[0] == "FOUND" for n in names)
-            return f"{found}/{len(names)}"
-        print("=" * 70)
-        print(f"TOUR SUMMARY: CNN objects recognised {count('object')} · colour blocks found {count('block')}")
-        for name, _, expected, _ in TARGETS:
-            status, seen = self.results.get(name, ("NOT VISITED", "tour stopped before this"))
-            print(f"  {name.lower():12s} expected {expected:11s} {seen:38s} {status}")
-        if self.cnn.dropped_frames or self.cnn.failures:
-            print(f"  CNN: {self.cnn.failures} failed inferences, {self.cnn.dropped_frames} dropped frames")
-        print(f"  images saved in {self.images}")
-        print("=" * 70)
 
 
 if __name__ == "__main__":

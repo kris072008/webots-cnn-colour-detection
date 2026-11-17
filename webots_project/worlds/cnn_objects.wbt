@@ -18,6 +18,7 @@ WorldInfo {
     "Objects are real size, so each sits at its own distance from the centre:"
     "the robot stops where the object fills its camera view. Blocks sit 3.5 m out."
     "The view follows the robot; the yellow ball on top is only a display marker."
+    "Sensors: lidar (finds objects), GPS and inertial unit (own pose), camera (names them)."
     "Controller: object_finder."
   ]
   title "CNN object tour"
@@ -120,6 +121,25 @@ DEF DEER Deer {
   rotation 0 0 1 7.0686
   name "deer"
 }
+# Flat sea-coloured patch under and behind the paper boat, out to the robot's
+# horizon (shape only, no physics).
+# Its hue (about 98 on OpenCV's 0-179 scale) is below the blue-block range
+# (105-130), so the HSV detector does not mistake it for a blue block.
+DEF WATER Pose {
+  translation 0 -4 0.002
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.12 0.32 0.42
+        roughness 0.15
+        metalness 0
+      }
+      geometry Plane {
+        size 5 7
+      }
+    }
+  ]
+}
 DEF BOAT PaperBoat {
   translation -0.0 -1.75 0
   rotation 0 0 1 6.2832
@@ -132,6 +152,25 @@ DEF EPUCK E-puck {
   camera_width 160
   camera_height 120
   turretSlot [
+    # Sensors for the autonomous tour: a 360-degree, 8-layer lidar finds the
+    # objects; GPS and the inertial unit give the robot its own position and heading.
+    Lidar {
+      translation 0 0 0.05
+      name "lidar"
+      horizontalResolution 720
+      fieldOfView 6.2832
+      verticalFieldOfView 0.4
+      numberOfLayers 8
+      minRange 0.08
+      maxRange 14
+      type "fixed"
+    }
+    GPS {
+      name "gps"
+    }
+    InertialUnit {
+      name "inertial unit"
+    }
     # Display marker only (no physics): a tall yellow pole and ball so the
     # small e-puck is easy to follow on a projector. It sits behind and
     # above the camera, so it never appears in the robot's own images.
