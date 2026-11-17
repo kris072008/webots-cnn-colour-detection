@@ -4,7 +4,7 @@ Module 5FTC2068, University of Hertfordshire / PSB Academy.
 
 | Folder | What it contains |
 |---|---|
-| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`). `gradcam.ipynb`: what the CNN looks at. `webots_shapes.ipynb`: a CNN trained on auto-labelled Webots images (`webots_shapes/`). `webots_animals.ipynb`: the CNN on all 8 Webots animals seen by the robot (`webots_animals/`). `webots_object_tour.ipynb`: the CNN on the robot's object-tour photos (`webots_object_tour/`) |
+| [`cnn/`](cnn/) | `cifar10_cnn.ipynb`: CIFAR-10 CNN training, evaluation, Webots-camera predictions and TFLite quantisation benchmark. `own_photos.ipynb`: the trained CNN on 18 of my own photos (`my_photos/`). `gradcam.ipynb`: what the CNN looks at. `webots_shapes.ipynb`: a CNN trained on auto-labelled Webots images (`webots_shapes/`). `webots_animals.ipynb`: the CNN on all 8 Webots animals seen by the robot (`webots_animals/`). `webots_object_tour.ipynb`: the CNN on the robot's object-tour photos (`webots_object_tour/`). **`run_webots_detection_colab.ipynb`: self-contained, runs in Google Colab with Run all: the robot's int8 CNN and Grad-CAM on 17 Webots images, plus upload-your-own-image** |
 | [`cnn/results/videos/`](cnn/results/videos/) | Demo videos: the normal search, and the distractor world without and with the shape check |
 | [`webots_project/`](webots_project/) | Webots R2025a package: e-puck colour-block search with OpenCV HSV detection and off-loop CNN inference. See its [README](webots_project/README.md) and [DEMO](webots_project/DEMO.md). |
 
