@@ -15,7 +15,8 @@ webots_project/
 │   ├── colour_blocks_distractors.wbt   # same + a red ball, green cylinder, blue ball (shape CNN test)
 │   ├── cnn_camera_test.wbt             # e-puck facing a dog (CIFAR-10 class) for the CNN camera test
 │   ├── shape_dataset.wbt               # dataset world: blocks, balls, cylinders in random colours
-│   └── animal_safari.wbt               # all 8 Webots animals, photographed by a supervisor e-puck
+│   ├── animal_safari.wbt               # all 8 Webots animals, photographed by a supervisor e-puck
+│   └── cnn_objects.wbt                 # demo: e-puck tours blocks and CIFAR-10 objects with a checklist
 ├── controllers/
 │   ├── colour_detector/
 │   │   ├── colour_detector.py   # robot controller: state machine, motors, sensors, logging
@@ -172,6 +173,7 @@ These were measured in Webots R2025a, headless, on Apple M4:
 * **CNN model:** 86.47% test accuracy on the 10,000 CIFAR-10 test images (Keras float32); the deployed full-int8 TFLite model scores 86.57% at 328 kB (3.7× smaller than float32). Full numbers: `../cnn/results/`.
 * **CNN on Webots camera images:** in `cnn_camera_test.wbt` the dog was classified as **horse (95%)**, with dog third (1%). The blocks are classified mostly as airplane or ship, because a coloured box is not a CIFAR-10 class. Both are out-of-distribution results, discussed in the report. Logs and images: `../cnn/results/webots_runs/`.
 * **Every Webots animal** (`animal_safari.wbt`, 8 animals × 24 directions, 192 images labelled by background subtraction): deer and horse were named correctly in 43 of 48 views, cat and dog in none (both mostly "horse"). With the background replaced by grey, the dog was right in 12 of 24 views and the deer dropped from 21 to 4: the CNN leans on the scenery. Re-run with Webots (`--batch` on `worlds/animal_safari.wbt` writes `../cnn/webots_animals/`), then `../cnn/webots_animals.ipynb`. Results: `../cnn/results/webots_animals/`.
+* **CNN object tour** (`cnn_objects.wbt`, controller `object_finder`, separate demo): the e-puck drives to three blocks and five real-size Webots objects (truck, horse, car, deer, paper boat), checks blocks with HSV and names objects with the int8 CNN over three photos each. Result: 4 of 5 objects and 3 of 3 blocks; the paper boat is called "airplane". The robot reads object positions as a map; recognition is from the camera only. Photos and CNN answers: `../cnn/webots_object_tour.ipynb`.
 
 ## Tests
 
