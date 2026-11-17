@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 controllers/colour_detector/images/
 .pytest_cache/
+controllers/object_finder/images/

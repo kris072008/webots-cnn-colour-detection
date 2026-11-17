@@ -6,3 +6,5 @@ __pycache__/
 webots_project/controllers/colour_detector/images/
 cnn/outputs/
 *.zip
+webots_project/controllers/object_finder/images/
+webots_project/worlds/.*.wbproj

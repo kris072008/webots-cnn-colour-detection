@@ -1,0 +1,131 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/toyota/ToyotaPriusSimple.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/generic/TruckSimple.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Horse.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/animals/protos/Deer.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/toys/protos/PaperBoat.proto"
+
+WorldInfo {
+  info [
+    "CNN object tour (separate demo world): an e-puck visits three coloured blocks"
+    "and five CIFAR-10 objects (car, truck, horse, deer, paper boat). Blocks are"
+    "checked with HSV colour detection; objects are named by the CIFAR-10 CNN."
+    "Objects are real size, so each sits at its own distance from the centre:"
+    "the robot stops where the object fills its camera view. Blocks sit 3.5 m out."
+    "Controller: object_finder."
+  ]
+  title "CNN object tour"
+  basicTimeStep 32
+}
+Viewpoint {
+  orientation -0.5774 0.5774 0.5774 2.0944
+  position 0 0 34
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  floorSize 30 30
+  floorTileSize 2 2
+  wallHeight 0.3
+}
+DEF RED_BLOCK Solid {
+  translation 3.5 0.0 0.25
+  rotation 0 0 1 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.9 0.05 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 0.5 0.5
+      }
+    }
+  ]
+  name "red block"
+  boundingObject Box {
+    size 0.5 0.5 0.5
+  }
+}
+DEF CAR ToyotaPriusSimple {
+  translation -6.364 -6.364 0.4
+  rotation 0 0 1 5.4978
+  color 0.75 0.08 0.08
+  name "car"
+}
+DEF GREEN_BLOCK Solid {
+  translation 0.0 3.5 0.25
+  rotation 0 0 1 3.1416
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.8 0.05
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 0.5 0.5
+      }
+    }
+  ]
+  name "green block"
+  boundingObject Box {
+    size 0.5 0.5 0.5
+  }
+}
+DEF HORSE Horse {
+  translation -4.738 4.738 0
+  rotation 0 0 1 3.927
+  name "horse"
+}
+DEF BLUE_BLOCK Solid {
+  translation -3.5 0.0 0.25
+  rotation 0 0 1 4.7124
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.05 0.1 0.9
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 0.5 0.5
+      }
+    }
+  ]
+  name "blue block"
+  boundingObject Box {
+    size 0.5 0.5 0.5
+  }
+}
+DEF TRUCK TruckSimple {
+  translation 7.212 7.212 0.5
+  rotation 0 0 1 4.527
+  trailer NULL
+  name "truck"
+}
+DEF DEER Deer {
+  translation 3.677 -3.677 0
+  rotation 0 0 1 7.0686
+  name "deer"
+}
+DEF BOAT PaperBoat {
+  translation -0.0 -1.75 0
+  rotation 0 0 1 6.2832
+  name "boat"
+}
+DEF EPUCK E-puck {
+  translation 0 0 0
+  controller "object_finder"
+  supervisor TRUE
+  camera_width 160
+  camera_height 120
+}
