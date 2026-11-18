@@ -1,4 +1,18 @@
-# Demo run sheet: 18 Nov presentation
+# Demo run sheet
+
+## Main demo: the CNN object tour (`worlds/cnn_objects.wbt`)
+
+| Step | Do | Point out |
+|---|---|---|
+| 1 | Before class: open `cnn_objects.wbt` from this folder (File → Open World) on Wi-Fi and wait for the models to load | Console: `[init] CNN ON` and, if set up, `Grad-CAM ON` |
+| 2 | Let it run until the checklist (top right of the 3D view) shows 2–3 objects, then ⏸ | The yellow ball marks the robot; `[lidar] … 8 objects found`: nobody told it where they are |
+| 3 | Explain: blob → block by HSV; otherwise 3 photos → int8 CNN votes; under 60% or disagreeing views → "unsure" | `[cnn] truck view 1/3 …` lines, `[0.3 ms, off the control loop]` |
+| 4 | Point at the top-left window | Live Grad-CAM: where the CNN looked, e.g. the truck's wheel and cab |
+| 5 | Press ⏩ | `Done: 7 of 8 named correctly`; the paper boat is "airplane" even on water |
+
+If `Could not find the controller directory` appears, the world was opened from a copy outside this folder: reopen it from `webots_project/worlds/`.
+
+## Colour-block search (`worlds/colour_blocks.wbt`)
 
 The demo takes about 3 minutes. Rehearse it once the day before.
 

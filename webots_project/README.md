@@ -1,22 +1,29 @@
-# Colour-Block Search and CNN Classification with an e-puck (Webots)
+# CNN Object Tour and Colour-Block Search with an e-puck (Webots)
 
-An e-puck robot searches a 3 × 3 m arena for **red, green and blue blocks** at random positions.
-It detects them with **OpenCV HSV colour segmentation**, steers towards each one, stops, photographs it, and optionally classifies the photo with a **CIFAR-10 CNN**.
-The CNN runs on a background thread, so it never slows down driving.
+**Main demo: `worlds/cnn_objects.wbt`, the CNN object tour.** The e-puck finds every object in the arena **by itself** with a 360° lidar, drives to each one, and names it: a coloured block by **OpenCV HSV** detection, anything else (truck, horse, car, deer, a paper boat on water) by an **int8 CIFAR-10 CNN** over three views that vote, answering **"unsure"** when they disagree. A checklist and a **live Grad-CAM heatmap** of each named object are drawn on the 3D view. Result: **8 of 8 objects found, 7 of 8 named correctly**.
+
+**Also included: `worlds/colour_blocks.wbt`, the colour-block search** (the brief's colour-detection demo). The e-puck searches a 3 × 3 m arena for red, green and blue blocks at random positions with a five-state controller and HSV detection; the CNN runs on a background thread so it never slows the driving.
 
 Tested with **Webots R2025a**, Python 3.12–3.14, OpenCV 4.x on macOS.
+
+## Run the main demo in 60 seconds
+
+1. `python3 -m pip install opencv-python numpy ai-edge-litert` (for the Python Webots uses).
+2. In Webots: **File → Open World… → `worlds/cnn_objects.wbt`** (open it from this folder, so Webots finds `controllers/`). The first time, wait about a minute while Webots downloads the car, truck and animal models.
+3. It starts by itself. Press **⏩** to speed up. Watch the console: `[lidar] … 8 objects found`, then `[cnn] … view 1/3 …`, the checklist, and finally `TOUR SUMMARY: … 7 of 8 real objects named correctly`.
+4. **Optional, live Grad-CAM:** this needs TensorFlow. Create `controllers/object_finder/runtime.ini` containing `[python]` and `COMMAND = /path/to/python-with-tensorflow` (Python 3.12: `pip install tensorflow opencv-python-headless numpy ai-edge-litert`). The console then says `Grad-CAM ON` and the heatmap window appears. Without it the console says `Grad-CAM OFF` and the tour runs unchanged.
 
 ## Folder layout
 
 ```
 webots_project/
 ├── worlds/
-│   ├── colour_blocks.wbt               # main demo: arena + 3 blocks (random positions) + e-puck
+│   ├── colour_blocks.wbt               # colour-block search: arena + 3 blocks (random positions) + e-puck
 │   ├── colour_blocks_distractors.wbt   # same + a red ball, green cylinder, blue ball (shape CNN test)
 │   ├── cnn_camera_test.wbt             # e-puck facing a dog (CIFAR-10 class) for the CNN camera test
 │   ├── shape_dataset.wbt               # dataset world: blocks, balls, cylinders in random colours
 │   ├── animal_safari.wbt               # all 8 Webots animals, photographed by a supervisor e-puck
-│   └── cnn_objects.wbt                 # demo: e-puck tours blocks and CIFAR-10 objects with a checklist
+│   └── cnn_objects.wbt                 # MAIN DEMO: lidar finds 8 objects, HSV + CNN name them, live Grad-CAM
 ├── controllers/
 │   ├── colour_detector/
 │   │   ├── colour_detector.py   # robot controller: state machine, motors, sensors, logging
@@ -32,14 +39,19 @@ webots_project/
 │   │   └── projection.py               # pinhole projection of known objects into the camera image
 │   ├── demo_recorder/
 │   │   └── demo_recorder.py     # supervisor: demo video with live captions + ground truth for scoring
-│   └── animal_photographer/
-│       ├── animal_photographer.py  # supervisor: photographs each animal from 24 directions
-│       └── silhouette.py           # background subtraction: the animal's mask and box
+│   ├── animal_photographer/
+│   │   ├── animal_photographer.py  # supervisor: photographs each animal from 24 directions
+│   │   └── silhouette.py           # background subtraction: the animal's mask and box
+│   └── object_finder/              # MAIN DEMO controller (cnn_objects.wbt)
+│       ├── object_finder.py        # lidar search, drive, HSV/CNN naming, vote + "unsure", checklist
+│       ├── lidar_objects.py        # lidar point cloud -> objects; the vote (pure, unit-tested)
+│       └── gradcam_live.py         # optional live Grad-CAM on a background thread
 └── tests/                       # 75 unit tests, no Webots needed
     ├── test_vision.py           # detector + classifier
     ├── test_benchmark.py        # timing experiment
     ├── test_projection.py       # dataset labelling maths + shape model hook
-    └── test_silhouette.py       # animal background subtraction
+    ├── test_silhouette.py       # animal background subtraction
+    └── test_lidar_objects.py    # lidar grouping and the three-view vote
 ```
 
 The training notebooks are `../cnn/cifar10_cnn.ipynb` (CIFAR-10) and `../cnn/webots_shapes.ipynb` (the shape model trained on Webots images).
