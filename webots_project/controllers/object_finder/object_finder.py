@@ -113,7 +113,8 @@ class ObjectFinder:
         print(f"[init] camera {self.width}x{self.height}, CNN {'ON' if self.cnn.enabled else 'OFF'} - "
               f"{self.cnn.description}")
         self.gradcam = LiveGradCam()
-        print(f"[init] Grad-CAM {'ON (Keras model, background thread)' if self.gradcam.available else 'OFF - ' + self.gradcam.reason}")
+        state = "ON (Keras model, background thread)" if self.gradcam.available else "OFF - " + self.gradcam.reason
+        print(f"[init] Grad-CAM {state}")
         self.display = self.sup.getDevice("display")  # optional screen for the heatmap
         self.images = HERE / "images"
         self.capture_count = 0

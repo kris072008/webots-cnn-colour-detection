@@ -62,7 +62,7 @@ def place_objects(supervisor: Supervisor, rng: random.Random,
     names = list(BLOCK_DEFS) + distractors
     layout = random_layout(rng, robot_xy, len(names))
     placed: dict[str, tuple[float, float]] = {}
-    for def_name, (x, y) in zip(names, layout):
+    for def_name, (x, y) in zip(names, layout, strict=True):
         node = supervisor.getFromDef(def_name)
         if node is None:
             print(f"[randomiser] WARNING: no node with DEF {def_name} in the world")

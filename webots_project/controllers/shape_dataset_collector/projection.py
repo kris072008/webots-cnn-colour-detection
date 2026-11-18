@@ -102,7 +102,7 @@ def project_box(box: Box3D, robot_xy: tuple[float, float], robot_yaw: float,
         pts = [project_point(p, robot_xy, robot_yaw, width, height) for p in box.corners()]
         if any(p is None for p in pts):
             return None  # partly behind the camera: skip rather than guess
-        us, vs, ds = zip(*pts)
+        us, vs, ds = zip(*pts, strict=True)
         u0, u1, v0, v1, nearest = min(us), max(us), min(vs), max(vs), min(ds)
     full = (u1 - u0) * (v1 - v0)
     cu0, cu1 = max(u0, 0.0), min(u1, float(width))

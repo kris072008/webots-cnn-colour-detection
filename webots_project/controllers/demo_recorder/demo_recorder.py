@@ -45,7 +45,7 @@ COLOUR = {"RED_BLOCK": "red", "GREEN_BLOCK": "green", "BLUE_BLOCK": "blue",
 def look_at(position, target):
     """Axis-angle orientation for a Webots Viewpoint (x forward, z up) at
     ``position`` looking at ``target``."""
-    f = [t - p for t, p in zip(target, position)]
+    f = [t - p for t, p in zip(target, position, strict=True)]
     n = math.sqrt(sum(c * c for c in f))
     f = [c / n for c in f]
     left = [-f[1], f[0], 0.0]  # z_world x f, then normalise
