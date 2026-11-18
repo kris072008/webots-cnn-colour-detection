@@ -19,7 +19,11 @@ import numpy as np
 
 CLASS_NAMES = ("airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck")
 LAST_CONV = "activation_5"  # last conv block output (8x8x128), as in cnn/gradcam.ipynb
-MODEL = Path(__file__).resolve().parents[3] / "cnn" / "results" / "models" / "cifar10_cnn.keras"
+_HERE = Path(__file__).resolve()
+# The Keras model ships next to the int8 one in a submission package; in the full repository it lives in cnn/results/models/.
+_CANDIDATES = [_HERE.parents[1] / "colour_detector" / "models" / "cifar10_cnn.keras",
+               _HERE.parents[3] / "cnn" / "results" / "models" / "cifar10_cnn.keras"]
+MODEL = next((m for m in _CANDIDATES if m.is_file()), _CANDIDATES[-1])
 
 
 def overlay(rgb32: np.ndarray, cam: np.ndarray, size: int) -> np.ndarray:
