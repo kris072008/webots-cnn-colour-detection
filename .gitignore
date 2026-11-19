@@ -11,3 +11,5 @@ webots_project/worlds/.*.wbproj
 ~$*
 .venv-webots/
 webots_project/controllers/object_finder/runtime.ini
+report/humaniser_run/
+report/webots_project/
